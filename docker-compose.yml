@@ -20,6 +20,22 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - miniodata:/data
+  # Cổng AI chuẩn OpenAI (https://github.com/cheaper-inference/OmniRoute): BE gọi http://localhost:20128/v1.
+  # Dashboard cùng cổng: thêm provider (kể cả Ollama), tạo combo fallback, lấy API key.
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    restart: unless-stopped
+    stop_grace_period: 40s
+    environment:
+      PORT: 20128
+      JWT_SECRET: ${OMNIROUTE_JWT_SECRET:?cần khai báo trong .env}
+      API_KEY_SECRET: ${OMNIROUTE_API_KEY_SECRET:?cần khai báo trong .env}
+      INITIAL_PASSWORD: ${OMNIROUTE_INITIAL_PASSWORD:-}   # trống = tự đặt mật khẩu ở lần mở dashboard đầu tiên
+    ports:
+      - "127.0.0.1:${OMNIROUTE_PORT:-20128}:20128"        # chỉ máy này; muốn LAN gọi được thì bỏ 127.0.0.1 và BẬT yêu cầu API key
+    volumes:
+      - omniroutedata:/app/data
 volumes:
   pgdata:
   miniodata:
+  omniroutedata:

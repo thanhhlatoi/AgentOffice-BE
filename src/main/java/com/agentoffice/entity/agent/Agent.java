@@ -30,6 +30,9 @@ public class Agent extends AbstractAggregateRoot<Agent> {
     private String modelProfile;
     @Setter
     private int maxConcurrentTasks = 1;
+    /** Tên bot (profile) của agent này trên Hermes; null = chưa có. */
+    @Setter
+    private String hermesProfile;
     private Instant createdAt = Instant.now();
 
     public Agent(String name, String role, String department) {

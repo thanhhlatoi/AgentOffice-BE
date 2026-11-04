@@ -37,7 +37,15 @@ public enum ErrorCode {
     // ---- usage / tool (dành cho các prompt sau)
     BUDGET_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY),
     TOOL_UNKNOWN(HttpStatus.NOT_FOUND),
-    TOOL_DENIED_SCOPE(HttpStatus.FORBIDDEN);
+    TOOL_DENIED_SCOPE(HttpStatus.FORBIDDEN),
+
+    // ---- LLM
+    LLM_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
+
+    // ---- hermes admin (bot/profile trên máy Hermes)
+    HERMES_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE),
+    HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
+    HERMES_UNSUPPORTED(HttpStatus.NOT_IMPLEMENTED);
 
     private final HttpStatus status;
 

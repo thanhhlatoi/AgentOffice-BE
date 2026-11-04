@@ -18,4 +18,4 @@ management:
       show-details: always
 
 agentoffice:
-  planner: fake
+  planner: hermes
