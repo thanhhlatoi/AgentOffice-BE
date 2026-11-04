@@ -1,0 +1,214 @@
+### @name agent
+POST http://localhost:8080/api/agents
+Content-Type: application/json
+
+{"name":"Linh","role":"Demand Planner","department":"Tai chinh"}
+
+### tạo agent thứ hai (FakePlanner giao việc cho agent đầu và agent cuối)
+POST http://localhost:8080/api/agents
+Content-Type: application/json
+
+{"name":"Minh","role":"Analyst","department":"Tai chinh"}
+
+### tạo goal -> PLANNING (nền) -> AWAITING_PLAN_APPROVAL
+POST http://localhost:8080/api/goals
+Content-Type: application/json
+
+{"title":"Lập báo cáo Q4","description":"Tổng hợp doanh thu","tokenBudget":100000}
+
+### danh sách goal / chi tiết (cây task + tiến độ %)
+GET http://localhost:8080/api/goals
+###
+GET http://localhost:8080/api/goals/{{goalId}}
+
+### duyệt / từ chối kế hoạch (hoặc POST /api/approvals/{id}/approve với kind=PLAN)
+POST http://localhost:8080/api/goals/{{goalId}}/plan/approve
+###
+POST http://localhost:8080/api/goals/{{goalId}}/plan/reject
+Content-Type: application/json
+
+{"reason":"Thiếu bước kiểm tra số liệu"}
+
+### huỷ goal
+POST http://localhost:8080/api/goals/{{goalId}}/cancel
+
+### giao thẳng 1 task cho agent (priority: HIGH | NORMAL | LOW)
+POST http://localhost:8080/api/agents/{{agentId}}/tasks
+Content-Type: application/json
+
+{"title":"Soạn email nhắc việc","input":"Nhắc anh Nam nộp báo cáo","priority":"HIGH"}
+
+### tìm task (phân trang)
+GET http://localhost:8080/api/tasks?status=QUEUED&agentId={{agentId}}&page=0&size=20
+###
+POST http://localhost:8080/api/tasks/{{taskId}}/cancel
+###
+POST http://localhost:8080/api/tasks/{{taskId}}/retry
+###
+PATCH http://localhost:8080/api/tasks/{{taskId}}
+Content-Type: application/json
+
+{"priority":"LOW"}
+
+### pause / resume hệ thống
+POST http://localhost:8080/api/system/pause
+###
+POST http://localhost:8080/api/system/resume
+###
+GET http://localhost:8080/api/system/state
+
+### approval: danh sách chờ duyệt, duyệt, từ chối
+GET http://localhost:8080/api/approvals?status=PENDING
+###
+POST http://localhost:8080/api/approvals/{{approvalId}}/approve
+Content-Type: application/json
+
+{"note":"ok"}
+###
+POST http://localhost:8080/api/approvals/{{approvalId}}/reject
+Content-Type: application/json
+
+{"reason":"Không gửi tới địa chỉ này"}
+
+### approval policy (không tắt được MONEY/DESTRUCTIVE -> 422)
+GET http://localhost:8080/api/approval-policies
+###
+PUT http://localhost:8080/api/approval-policies
+Content-Type: application/json
+
+{"riskLevel":"MONEY","requiresApproval":false}
+
+### catch-up events
+GET http://localhost:8080/api/events?afterId=0
+
+
+### ===== Lát 1: chi phí LLM (tiền là số nguyên micro-USD; 1 USD = 1_000_000) =====
+
+### Lịch sử giá (lọc: ?provider=anthropic&model=claude-sonnet-5-5)
+GET http://localhost:8080/api/model-prices
+
+### Thêm giá mới (đóng bản cũ). effectiveFrom phải muộn hơn bản mới nhất của model, nếu không => 409
+PUT http://localhost:8080/api/model-prices
+Content-Type: application/json
+
+{"provider":"anthropic","model":"claude-sonnet-5-5","inputPerMTokMicroUsd":3000000,"outputPerMTokMicroUsd":15000000,
+ "cachedInputPerMTokMicroUsd":300000,"effectiveFrom":"2026-12-01T00:00:00Z","isLocal":false,"note":"giá thật tôi nhập"}
+
+### Tổng hợp theo ngày|agent|project|department|model (from/to là NGÀY theo múi giờ báo cáo, gồm cả hai đầu)
+GET http://localhost:8080/api/usage/summary?from=2026-11-01&to=2026-11-30&groupBy=model
+
+### Từng cuộc gọi, mới nhất trước; trang sau: thêm &cursor=<nextCursor>
+GET http://localhost:8080/api/usage/records?limit=50
+
+### Model đã gọi mà chưa có giá
+GET http://localhost:8080/api/usage/unpriced
+
+
+### ===== Lát 2: ngân sách (micro-USD). Chỉ chủ gọi; agent không có đường nào tới đây =====
+
+### Danh sách (lọc: ?scopeType=AGENT&scopeId=...). Có sẵn GLOBAL DAY 5 USD, GLOBAL MONTH 100 USD (số MẪU), mỗi agent mới 1 USD/ngày
+GET http://localhost:8080/api/budgets
+
+### Tạo ngân sách (scopeType: GLOBAL|DEPARTMENT|AGENT|PROJECT|GOAL; period: DAY|MONTH|TOTAL; hardAction: BLOCK|WARN_ONLY). Trùng phạm vi+kỳ => 409
+POST http://localhost:8080/api/budgets
+Content-Type: application/json
+
+{"scopeType":"AGENT","scopeId":"{{agentId}}","period":"MONTH","limitMicroUsd":20000000,"softPct":80,"hardAction":"BLOCK"}
+
+### Đã dùng / đã đặt chỗ / còn lại / % của kỳ hiện tại
+GET http://localhost:8080/api/budgets/{{budgetId}}/status
+
+### Đổi ngưỡng mềm, hành động, bật/tắt (KHÔNG đổi hạn mức ở đây)
+PATCH http://localhost:8080/api/budgets/{{budgetId}}
+Content-Type: application/json
+
+{"softPct":70,"enabled":true}
+
+### Tăng hạn mức (chỉ tăng, bắt buộc lý do; task WAITING_BUDGET được chạy tiếp ngay). Giảm/bằng => 422
+POST http://localhost:8080/api/budgets/{{budgetId}}/raise
+Content-Type: application/json
+
+{"newLimit":50000000,"reason":"Dự án gấp tuần này"}
+
+### Lịch sử đổi hạn mức (chỉ-thêm)
+GET http://localhost:8080/api/budgets/{{budgetId}}/changes
+
+### Xoá: 409 nếu còn task chờ ngân sách này hoặc đã có lịch sử đổi hạn mức (khi đó hãy tắt: enabled=false)
+DELETE http://localhost:8080/api/budgets/{{budgetId}}
+
+
+### ===== Lát 3: dự án + Kanban =====
+
+### Tạo dự án (color #RRGGBB). Chi tiết: tiến độ, số task theo trạng thái, chi phí/ngân sách, hạn chót, goals
+POST http://localhost:8080/api/projects
+Content-Type: application/json
+
+{"name":"Kênh Reddit ES","description":"Truyện Reddit tiếng Tây Ban Nha","color":"#16A34A","deadline":"2027-03-01T00:00:00Z"}
+
+###
+GET http://localhost:8080/api/projects
+
+###
+GET http://localhost:8080/api/projects/{{projectId}}
+
+### Đổi tay chỉ ACTIVE|PAUSED (DONE do hệ thống tự đặt; ARCHIVED qua /archive)
+PATCH http://localhost:8080/api/projects/{{projectId}}
+Content-Type: application/json
+
+{"status":"PAUSED"}
+
+### Lưu trữ (409 nếu còn task đang mở)
+POST http://localhost:8080/api/projects/{{projectId}}/archive
+
+### Lịch sử tiến độ theo ngày (ảnh chụp mỗi giờ, ghi đè trong ngày)
+GET http://localhost:8080/api/projects/{{projectId}}/progress-history?from=2026-10-01&to=2026-11-30
+
+### Đưa goal (và mọi task của nó) sang dự án khác; projectId null = ra khỏi dự án
+PUT http://localhost:8080/api/goals/{{goalId}}/project
+Content-Type: application/json
+
+{"projectId":"{{projectId}}"}
+
+### Trọng số (1-5) và nhãn của task: weight là trọng số trong tiến độ
+PATCH http://localhost:8080/api/tasks/{{taskId}}/meta
+Content-Type: application/json
+
+{"weight":3,"labels":["gấp","q4"]}
+
+### Bảng Kanban: 5 cột (waiting|running|review|done|closed), mỗi cột total + tối đa limit thẻ + nextCursor
+GET http://localhost:8080/api/kanban?projectId={{projectId}}&priority=HIGH&q=bao%20cao&limit=50
+
+### Tải thêm một cột
+GET http://localhost:8080/api/kanban?column=done&cursor={{nextCursor}}&limit=50
+
+### Kéo thả = LỆNH. Chỉ trả 200 hoặc 409 (details.reasonCode):
+###   STALE_VERSION, NOT_ALLOWED, NOT_SUPPORTED, USE_APPROVAL_DIALOG, DEPENDENCIES_PENDING, ALREADY_STARTED, GOAL_NOT_RUNNING, RANK_EXHAUSTED
+### Sắp xếp: afterTaskId = thẻ nằm ngay TRƯỚC, beforeTaskId = thẻ nằm ngay SAU thẻ được kéo
+POST http://localhost:8080/api/tasks/{{taskId}}/move
+Content-Type: application/json
+
+{"toColumn":"waiting","afterTaskId":"{{otherTaskId}}","expectedVersion":3}
+
+### Đẩy lên chạy sớm (priority=HIGH, nextRunAt=now; không ép RUNNING)
+POST http://localhost:8080/api/tasks/{{taskId}}/move
+Content-Type: application/json
+
+{"toColumn":"running","expectedVersion":3}
+
+### Chạy lại task đã xong/hỏng = tạo task MỚI (retryOfTaskId), trả task mới
+POST http://localhost:8080/api/tasks/{{taskId}}/move
+Content-Type: application/json
+
+{"toColumn":"waiting","expectedVersion":5}
+
+### Huỷ hợp tác (kéo vào closed)
+POST http://localhost:8080/api/tasks/{{taskId}}/move
+Content-Type: application/json
+
+{"toColumn":"closed","expectedVersion":3}
+
+### Giao task (chỉ khi chưa chạy) cho agent khác
+POST http://localhost:8080/api/tasks/{{taskId}}/assign
+Content-Type: application/json
+
+{"agentId":"{{agentId}}","expectedVersion":3}

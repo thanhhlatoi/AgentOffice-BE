@@ -1,0 +1,21 @@
+# Profile dev: bật bằng --spring.profiles.active=dev
+logging:
+  level:
+    com.agentoffice: DEBUG
+    org.hibernate.SQL: WARN
+    # Muốn xem SQL của 1 package lúc chạy: POST /actuator/loggers/<logger> {"configuredLevel":"DEBUG"} (cổng 8081, chỉ localhost)
+
+management:
+  server:
+    port: 8081
+    address: 127.0.0.1          # actuator chỉ nghe localhost
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers
+  endpoint:
+    health:
+      show-details: always
+
+agentoffice:
+  planner: fake

@@ -1,0 +1,11 @@
+# Dùng bởi test tích hợp (@ActiveProfiles("test")). Datasource do Testcontainers cấp qua @DynamicPropertySource.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 6      # nhiều context test được cache cùng lúc: giữ pool nhỏ
+
+agentoffice:
+  scheduler:
+    enabled: false              # test tự gọi tick() cho tất định
+  approval:
+    expiry-scan-ms: 3600000     # job quét hết hạn không chen vào test

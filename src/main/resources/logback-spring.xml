@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Quy ước mức log:
+    ERROR = cần người xử lý      WARN = bất thường đã tự xử lý
+    INFO  = mốc nghiệp vụ (đổi trạng thái, duyệt, huỷ)      DEBUG = chi tiết
+  KHÔNG log bí mật, args đầy đủ của tool, nội dung hội thoại/input task ở INFO.
+  MDC có sẵn: requestId (HTTP hoặc job-xxxx), taskId, agentId, goalId.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProfile name="prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+                <layout class="com.agentoffice.config.logging.JsonLogLayout"/>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <springProfile name="!prod">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} %5p [req=%X{requestId:--} task=%X{taskId:--} goal=%X{goalId:--}] %-28.28logger{27} : %m%n%wEx</pattern>
+            </encoder>
+        </appender>
+    </springProfile>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

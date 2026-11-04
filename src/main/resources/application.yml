@@ -1,0 +1,63 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]   # MINIO_* trong .env (không commit file này)
+  application:
+    name: agent-office-be
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agentoffice
+    username: agentoffice
+    password: agentoffice
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # schema do Flyway quản lý, Hibernate chỉ kiểm tra
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+agentoffice:
+  storage:                    # MinIO; app vẫn khởi động khi MinIO tắt, chỉ lỗi lúc dùng
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ROOT_USER:}
+    secret-key: ${MINIO_ROOT_PASSWORD:}
+    bucket: ${MINIO_BUCKET:agent-office}
+  cors-origins: http://localhost:5173
+  llm:
+    provider: fake            # fake | openai-compatible (TODO tự viết)
+  events:
+    relay-interval-ms: 500
+  secrets:
+    master-key-base64: ""     # TODO giai đoạn 4: 32 byte base64 cho AES-GCM
+  limits:
+    max-task-depth: 3         # độ sâu giao việc tối đa (đã chốt)
+    max-tasks-per-goal: 20    # số task tối đa mỗi goal (đã chốt)
+  planner: fake               # hermes | llm | fake
+  hermes:                     # chỉ dùng khi planner=hermes; thiếu base-url thì app dừng lúc khởi động
+    base-url: ${HERMES_URL:}
+    api-key: ${HERMES_API_KEY:}
+    model-check-url: ${HERMES_MODEL_CHECK_URL:}   # vd Ollama /api/tags, trống = bỏ qua
+    stall-timeout: 300s       # không có sự kiện trong khoảng này = kẹt, tự dừng run
+  scheduler:
+    enabled: true
+    tick-ms: 1000
+    max-concurrent-tasks: 4   # tổng số task chạy đồng thời; mỗi agent có thêm agent.max_concurrent_tasks (mặc định 1)
+    backoff-seconds: 5,30,120
+  approval:
+    require-plan-approval: true   # false = tạo task ngay khi Planner trả kế hoạch hợp lệ
+    ttl: 24h
+    on-reject: FAIL_TASK          # FAIL_TASK | RETURN_TO_AGENT
+    expiry-scan-ms: 60000
+  runner:
+    fake-delay-ms: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info     # mở rộng (metrics, loggers) chỉ ở profile dev, trên cổng riêng chỉ localhost

@@ -1,0 +1,10 @@
+target/
+.idea/
+*.iml
+.env
+# Environment files
+.env.*
+!.env.example
+
+# Markdown files
+*.md
