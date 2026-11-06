@@ -1,6 +1,11 @@
 package com.agentoffice.domain.task;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Thông tin agent đưa cho Planner (không có dữ liệu nhạy cảm). */
-public record AgentInfo(UUID id, String name, String role, String department, String status) {}
+public record AgentInfo(UUID id, String name, String role, String department, String status, List<String> skills) {
+    public AgentInfo(UUID id, String name, String role, String department, String status) {
+        this(id, name, role, department, status, List.of());
+    }
+}

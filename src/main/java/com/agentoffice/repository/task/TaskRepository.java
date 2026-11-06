@@ -19,6 +19,8 @@ public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificat
     List<Task> findByGoalIdOrderByCreatedAtAsc(UUID goalId);
     List<Task> findByParentTaskId(UUID parentTaskId);
     List<Task> findByStatus(TaskStatus status);
+    List<Task> findByAssigneeAgentIdOrderByCreatedAtDesc(UUID assigneeAgentId);
+    List<Task> findTop500ByOrderByCreatedAtDesc();
     long countByGoalId(UUID goalId);
     long countByStatus(TaskStatus status);
     long countByAssigneeAgentIdAndStatus(UUID assigneeAgentId, TaskStatus status);

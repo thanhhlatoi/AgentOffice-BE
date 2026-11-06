@@ -1,6 +1,6 @@
 spring:
   config:
-    import: optional:file:.env[.properties]   # MINIO_* trong .env (không commit file này)
+    import: optional:file:.env[.properties]
   application:
     name: agent-office-be
   datasource:
@@ -10,7 +10,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate   # schema do Flyway quản lý, Hibernate chỉ kiểm tra
+      ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
   flyway:
@@ -19,34 +19,52 @@ spring:
     default-property-inclusion: non_null
 
 server:
-  port: 8080
+  port: 8082
 
 agentoffice:
-  storage:                    # MinIO; app vẫn khởi động khi MinIO tắt, chỉ lỗi lúc dùng
+  storage:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MINIO_ROOT_USER:}
     secret-key: ${MINIO_ROOT_PASSWORD:}
     bucket: ${MINIO_BUCKET:agent-office}
   cors-origins: http://localhost:5173
   llm:
-    provider: ${LLM_PROVIDER:fake}   # fake | openai-compatible (9Router); đặt LLM_PROVIDER trong .env
+    provider: ${LLM_PROVIDER:fake}   # fake | local (máy AI local chuẩn OpenAI: Ollama, LM Studio, vLLM...) | openai-compatible (9Router, cố định theo .env, không đổi từ giao diện)
     gateway:                  # chỉ dùng khi provider=openai-compatible; thiếu base-url thì app dừng lúc khởi động
       base-url: ${NINEROUTER_URL:}      # vd http://localhost:20128 (không kèm /v1)
       api-key: ${NINEROUTER_API_KEY:}
       connect-timeout: 5s
       read-timeout: 120s
+    local:
+      base-url: ${LOCAL_LLM_URL:http://localhost:11434/v1}   # Ollama mặc định; gồm cả /v1
+      api-key: ${LOCAL_LLM_API_KEY:}                         # Ollama không cần
+      provider-name: ollama                                  # khớp model_price.provider để tính usage
+      default-model: ${LOCAL_LLM_MODEL:qwen3:4b}             # dùng khi tên model của request không phải model thật
+      model-aliases:                                         # tên model_profile -> model thật trên máy local
+        local.small: ${LOCAL_LLM_MODEL:qwen3:4b}
+        local.strong: ${LOCAL_LLM_MODEL:qwen3:32b}
+        planner: ${LOCAL_LLM_MODEL:qwen3:4b}
+      timeout: 300s
+      reasoning-effort: ${LOCAL_LLM_REASONING_EFFORT:}       # none = tắt suy luận (qwen3.x...); trống = không gửi
   events:
     relay-interval-ms: 500
   secrets:
-    master-key-base64: ""     # TODO giai đoạn 4: 32 byte base64 cho AES-GCM
+    master-key-base64: ${AGENTOFFICE_MASTER_KEY:}   # 32 byte base64 (openssl rand -base64 32): mã hoá khoá API lưu trong DB; trống = không lưu được khoá từ giao diện
+  owner-token: ${OWNER_TOKEN:}   # mã chủ: bắt buộc để sửa cài đặt AI từ giao diện (header Authorization: Bearer ...); trống = cài đặt chỉ xem
+  settings:
+    allowed-hosts: ${AI_ALLOWED_HOSTS:}   # tên máy ngoài mạng nội bộ được phép đặt làm địa chỉ AI/Hermes (phân cách bằng dấu phẩy); mặc định chỉ LAN/Tailscale/localhost
   limits:
     max-task-depth: 3         # độ sâu giao việc tối đa (đã chốt)
     max-tasks-per-goal: 20    # số task tối đa mỗi goal (đã chốt)
-  planner: fake               # hermes | llm | fake
+  planner: hermes             # hermes | llm | fake
   hermes:                     # chỉ dùng khi planner=hermes; thiếu base-url thì app dừng lúc khởi động
     base-url: ${HERMES_URL:}
     api-key: ${HERMES_API_KEY:}
     model-check-url: ${HERMES_MODEL_CHECK_URL:}   # vd Ollama /api/tags, trống = bỏ qua
+  hermes-admin:               # hermes_admin.py trên máy Hermes (quản lý bot/profile); trống = tắt, API trả 503
+    url: ${HERMES_ADMIN_URL:}
+    key: ${HERMES_ADMIN_KEY:}
+    clone-from: ${HERMES_CLONE_FROM:}   # bot mẫu sạch (vd tpl_base) để sao chép khi tạo bot cho agent mới, trống = bot trống; BE ghi đè description/SOUL/model, không đụng plugin
     stall-timeout: 300s       # không có sự kiện trong khoảng này = kẹt, tự dừng run
   scheduler:
     enabled: true
@@ -59,7 +77,13 @@ agentoffice:
     on-reject: FAIL_TASK          # FAIL_TASK | RETURN_TO_AGENT
     expiry-scan-ms: 60000
   runner:
+    type: ${AGENT_RUNNER:fake}   # fake | hermes (chạy task bằng bot của agent, xem service/task/HermesAgentRunner)
     fake-delay-ms: 30
+    poll-ms: 2000
+    max-wait-seconds: 7200       # gồm cả thời gian xếp hàng trên máy Hermes
+  security:
+    enabled: true
+    api-key: ${AGENTOFFICE_API_KEY:}   # header X-Api-Key, ≥16 ký tự; trống = từ chối mọi request
 
 management:
   endpoints:

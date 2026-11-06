@@ -9,6 +9,7 @@ import com.agentoffice.client.llm.LlmRequest;
 import com.agentoffice.client.llm.LlmResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
  *   [slow:ms]       -> chạy chậm ms mili-giây (kiểm tra cờ huỷ mỗi 10ms)
  */
 @Component
+@ConditionalOnProperty(name = "agentoffice.runner.type", havingValue = "fake", matchIfMissing = true)
 public class FakeAgentRunner implements AgentRunner {
     private final MeteredLlmClient llm;
     private final long delayMs;

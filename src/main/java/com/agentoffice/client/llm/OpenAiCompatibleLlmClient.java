@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +24,6 @@ import org.springframework.stereotype.Component;
  * Log chỉ có model, mã HTTP, thời gian, số token: không log api-key, prompt, câu trả lời.
  */
 @Component
-@Qualifier("raw")
 @ConditionalOnProperty(name = "agentoffice.llm.provider", havingValue = "openai-compatible")
 public class OpenAiCompatibleLlmClient implements LlmClient {
     /** Khớp model_price.provider: bản ghi giá của combo phải khai với provider này (PUT /api/model-prices). */

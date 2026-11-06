@@ -1,0 +1,212 @@
+{
+  "info": {
+    "name": "AgentOffice - Hermes",
+    "description": "Gọi Hermes trực tiếp (API :8642, admin :8650) và qua BE AgentOffice.\n\nĐiền các biến ở tab Variables (api_key, admin_key). KHÔNG commit khóa thật.\nHermes dùng IP Tailscale nên Postman phải chạy trên máy cùng mạng Tailscale.\nCác request ghi dữ liệu thật có chữ [GHI] trong tên.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "hermes_url", "value": "http://100.83.247.154:8642" },
+    { "key": "hermes_admin_url", "value": "http://100.83.247.154:8650" },
+    { "key": "be_url", "value": "http://localhost:8082" },
+    { "key": "api_key", "value": "", "description": "HERMES_API_KEY trong .env" },
+    { "key": "admin_key", "value": "", "description": "HERMES_ADMIN_KEY trong .env (khác api_key)" },
+    { "key": "run_id", "value": "" },
+    { "key": "goal_id", "value": "" },
+    { "key": "bot_name", "value": "editor" }
+  ],
+  "item": [
+    {
+      "name": "1. Hermes API (:8642)",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{api_key}}" }],
+            "url": { "raw": "{{hermes_url}}/health", "host": ["{{hermes_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "[GHI] Tạo run (giao việc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 2xx', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                  "const id = pm.response.json().run_id;",
+                  "pm.test('có run_id', () => pm.expect(id).to.be.a('string').and.not.empty);",
+                  "pm.collectionVariables.set('run_id', id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{api_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"input\": \"Viết 1 câu chào ngắn bằng tiếng Việt\"\n}" },
+            "url": { "raw": "{{hermes_url}}/v1/runs", "host": ["{{hermes_url}}"], "path": ["v1", "runs"] }
+          }
+        },
+        {
+          "name": "Theo dõi run (SSE)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{api_key}}" },
+              { "key": "Accept", "value": "text/event-stream" }
+            ],
+            "url": { "raw": "{{hermes_url}}/v1/runs/{{run_id}}/events", "host": ["{{hermes_url}}"], "path": ["v1", "runs", "{{run_id}}", "events"] },
+            "description": "Các dòng data: {...} có trường event: message.delta, tool.started, run.completed (kèm output), run.failed. Cần Postman 10 trở lên để xem SSE; bản cũ dùng curl -N."
+          }
+        },
+        {
+          "name": "[GHI] Dừng run",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{api_key}}" }],
+            "url": { "raw": "{{hermes_url}}/v1/runs/{{run_id}}/stop", "host": ["{{hermes_url}}"], "path": ["v1", "runs", "{{run_id}}", "stop"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Hermes Admin (:8650)",
+      "item": [
+        {
+          "name": "Danh sách bot",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_key}}" }],
+            "url": { "raw": "{{hermes_admin_url}}/profiles", "host": ["{{hermes_admin_url}}"], "path": ["profiles"] }
+          }
+        },
+        {
+          "name": "Chi tiết một bot",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_key}}" }],
+            "url": { "raw": "{{hermes_admin_url}}/profiles/{{bot_name}}", "host": ["{{hermes_admin_url}}"], "path": ["profiles", "{{bot_name}}"] }
+          }
+        },
+        {
+          "name": "[GHI] Sửa bot",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_key}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Mô tả mới\"\n}" },
+            "url": { "raw": "{{hermes_admin_url}}/profiles/{{bot_name}}", "host": ["{{hermes_admin_url}}"], "path": ["profiles", "{{bot_name}}"] },
+            "description": "Chỉ được sửa: model, provider, baseUrl, contextLength, soul, description."
+          }
+        },
+        {
+          "name": "[GHI] Khởi động lại gateway của bot",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_key}}" }],
+            "url": { "raw": "{{hermes_admin_url}}/profiles/{{bot_name}}/restart", "host": ["{{hermes_admin_url}}"], "path": ["profiles", "{{bot_name}}", "restart"] },
+            "description": "Việc đang chạy của bot sẽ bị ngắt."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Qua BE AgentOffice (:8082)",
+      "item": [
+        {
+          "name": "Danh sách bot Hermes",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{be_url}}/api/hermes/bots", "host": ["{{be_url}}"], "path": ["api", "hermes", "bots"] }
+          }
+        },
+        {
+          "name": "Chi tiết bot Hermes",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{be_url}}/api/hermes/bots/{{bot_name}}", "host": ["{{be_url}}"], "path": ["api", "hermes", "bots", "{{bot_name}}"] }
+          }
+        },
+        {
+          "name": "[GHI] Sửa bot Hermes",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Mô tả mới\"\n}" },
+            "url": { "raw": "{{be_url}}/api/hermes/bots/{{bot_name}}", "host": ["{{be_url}}"], "path": ["api", "hermes", "bots", "{{bot_name}}"] }
+          }
+        },
+        {
+          "name": "[GHI] Tạo bot Hermes",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"test-bot\",\n  \"cloneFrom\": \"editor\",\n  \"description\": \"Bot thử\"\n}" },
+            "url": { "raw": "{{be_url}}/api/hermes/bots", "host": ["{{be_url}}"], "path": ["api", "hermes", "bots"] },
+            "description": "Tạo profile thật trên máy Hermes. Trả 501 nếu hermes_admin.py chưa có POST /profiles."
+          }
+        },
+        {
+          "name": "[GHI] Khởi động lại bot Hermes",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{be_url}}/api/hermes/bots/{{bot_name}}/restart", "host": ["{{be_url}}"], "path": ["api", "hermes", "bots", "{{bot_name}}", "restart"] }
+          }
+        },
+        {
+          "name": "Danh sách agent",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{be_url}}/api/agents", "host": ["{{be_url}}"], "path": ["api", "agents"] }
+          }
+        },
+        {
+          "name": "[GHI] Tạo agent (tạo luôn bot trên Hermes)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Linh\",\n  \"role\": \"Demand Planner\",\n  \"department\": \"Tai chinh\"\n}" },
+            "url": { "raw": "{{be_url}}/api/agents", "host": ["{{be_url}}"], "path": ["api", "agents"] },
+            "description": "Khi HERMES_ADMIN_URL/KEY đã khai, BE tạo thêm profile trên Hermes và lưu vào hermesProfile. Hermes lỗi thì rollback, không tạo agent."
+          }
+        },
+        {
+          "name": "[GHI] Tạo goal (Hermes lập kế hoạch)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.id) pm.collectionVariables.set('goal_id', j.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Test Hermes\",\n  \"description\": \"Viết 1 câu chào\",\n  \"tokenBudget\": 5000\n}" },
+            "url": { "raw": "{{be_url}}/api/goals", "host": ["{{be_url}}"], "path": ["api", "goals"] },
+            "description": "Cần planner: hermes. Sau đó gọi 'Chi tiết goal': AWAITING_PLAN_APPROVAL = Hermes trả kế hoạch hợp lệ; FAILED = xem lý do."
+          }
+        },
+        {
+          "name": "Chi tiết goal",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{be_url}}/api/goals/{{goal_id}}", "host": ["{{be_url}}"], "path": ["api", "goals", "{{goal_id}}"] }
+          }
+        }
+      ]
+    }
+  ]
+}

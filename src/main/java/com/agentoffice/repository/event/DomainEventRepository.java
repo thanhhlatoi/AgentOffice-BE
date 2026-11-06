@@ -7,5 +7,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DomainEventRepository extends JpaRepository<DomainEvent, Long> {
+    @org.springframework.data.jpa.repository.Query("select coalesce(max(e.id), 0) from DomainEvent e")
+    long maxId();
+
     List<DomainEvent> findTop200ByIdGreaterThanOrderByIdAsc(long afterId);
 }

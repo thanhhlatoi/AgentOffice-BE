@@ -26,9 +26,9 @@ class LlmProviderWiringTest {
         runner.run(ctx -> assertThat(ctx).hasSingleBean(FakeLlmClient.class).doesNotHaveBean(OpenAiCompatibleLlmClient.class));
     }
 
-    @Test void openAiCompatibleReplacesFake() {
+    @Test void openAiCompatibleAddsGatewayBean() {   // FakeLlmClient luôn có bean (SwitchingLlmClient cần); gateway thắng ở SwitchingLlmClient
         runner.withPropertyValues("agentoffice.llm.provider=openai-compatible", "agentoffice.llm.gateway.base-url=http://localhost:20128")
-                .run(ctx -> assertThat(ctx).hasSingleBean(OpenAiCompatibleLlmClient.class).doesNotHaveBean(FakeLlmClient.class));
+                .run(ctx -> assertThat(ctx).hasSingleBean(OpenAiCompatibleLlmClient.class));
     }
 
     @Test void missingBaseUrlStopsStartup() {   // NINEROUTER_URL trống => ${NINEROUTER_URL:} = ""

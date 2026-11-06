@@ -1,7 +1,7 @@
 package com.agentoffice.controller.agent;
 
 import com.agentoffice.dto.agent.AgentDto;
-import com.agentoffice.entity.agent.Agent;
+import com.agentoffice.service.agent.AgentService;
 import com.agentoffice.mapper.agent.AgentMapper;
 import com.agentoffice.repository.agent.AgentRepository;
 import com.agentoffice.exception.NotFoundException;
@@ -18,10 +18,12 @@ public class AgentController {
 
     private final AgentRepository repo;
     private final AgentMapper mapper;
+    private final AgentService service;
 
-    public AgentController(AgentRepository repo, AgentMapper mapper) {
+    public AgentController(AgentRepository repo, AgentMapper mapper, AgentService service) {
         this.repo = repo;
         this.mapper = mapper;
+        this.service = service;
     }
 
     @GetMapping
@@ -34,6 +36,6 @@ public class AgentController {
 
     @PostMapping
     public AgentDto create(@Valid @RequestBody CreateAgent r) {
-        return mapper.toDto(repo.save(new Agent(r.name(), r.role(), r.department())));
+        return mapper.toDto(service.create(r.name(), r.role(), r.department()));
     }
 }

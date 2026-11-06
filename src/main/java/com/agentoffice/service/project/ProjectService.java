@@ -109,6 +109,18 @@ public class ProjectService {
         return p;
     }
 
+    /** Mở lại dự án đã lưu trữ (về ACTIVE); tiến độ tính lại ngay. */
+    @Transactional
+    public Project reopen(UUID id) {
+        Project p = projects.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("project", id));
+        if (p.getStatus() != ProjectStatus.ARCHIVED) return p;
+        p.setStatus(ProjectStatus.ACTIVE);
+        p.setFinishedAt(null);
+        projects.saveAndFlush(p);
+        events.publish(EventTypes.PROJECT_UPDATED, id, Map.of("projectId", id, "status", "ACTIVE"));
+        return p;
+    }
+
     // ------------------------------------------------------------------ chi tiết
     @Transactional(readOnly = true)
     public ProjectDto.Detail detail(UUID id) {

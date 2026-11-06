@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
     Optional<Approval> findByIdempotencyKey(String idempotencyKey);
     List<Approval> findByStatusOrderByCreatedAtAsc(ApprovalStatus status);
+    List<Approval> findTop50ByStatusNotOrderByCreatedAtDesc(ApprovalStatus status);
     List<Approval> findByStatusAndKind(ApprovalStatus status, ApprovalKind kind);
     List<Approval> findByStatusAndKindAndExpiresAtBefore(ApprovalStatus status, ApprovalKind kind, Instant t);
     Optional<Approval> findFirstByGoalIdAndKindAndStatus(UUID goalId, ApprovalKind kind, ApprovalStatus status);
