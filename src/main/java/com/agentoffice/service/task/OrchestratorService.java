@@ -262,7 +262,8 @@ public class OrchestratorService {
     // ------------------------------------------------------------------ nội bộ
     private List<AgentInfo> activeAgents() {
         return agents.findAll().stream().filter(a -> a.isActive())
-                .map(a -> new AgentInfo(a.getId(), a.getName(), a.getRole(), a.getDepartment(), a.getStatus())).toList();
+                .map(a -> new AgentInfo(a.getId(), a.getName(), a.getRole(), a.getDepartment(), a.getStatus(),
+                        a.getSkills() == null ? List.of() : List.copyOf(a.getSkills()))).toList();
     }
 
     private Approval pendingPlan(UUID goalId) {

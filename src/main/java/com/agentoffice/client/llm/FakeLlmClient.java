@@ -1,13 +1,9 @@
 package com.agentoffice.client.llm;
 
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /** Trả lời giả, để chạy được toàn bộ luồng mà chưa tốn tiền token. */
 @Component
-@Qualifier("raw")
-@ConditionalOnProperty(name = "agentoffice.llm.provider", havingValue = "fake", matchIfMissing = true)
 public class FakeLlmClient implements LlmClient {
     @Override public String provider() { return "fake"; }
 

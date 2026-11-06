@@ -6,4 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface AgentRepository extends JpaRepository<Agent, UUID> {}
+public interface AgentRepository extends JpaRepository<Agent, UUID> {
+    /** Agent chưa bị xoá (lưu trữ). */
+    java.util.List<Agent> findByArchivedAtIsNull(org.springframework.data.domain.Sort sort);
+}

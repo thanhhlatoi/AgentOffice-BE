@@ -79,7 +79,13 @@ class HermesPlannerTest {
 
     private HermesPlanner planner(String modelCheckUrl, Duration stall) {
         String url = "http://127.0.0.1:" + server.getAddress().getPort();
-        return new HermesPlanner(new HermesProperties(url + "/", "secret", modelCheckUrl, stall), mapper, new LimitsProperties(3, 20));
+        return build(new HermesProperties(url + "/", "secret", modelCheckUrl, stall));
+    }
+
+    private HermesPlanner build(HermesProperties props) {
+        var local = new com.agentoffice.config.LocalLlmProperties("http://x/v1", "", "ollama", "m", java.util.Map.of(), Duration.ofSeconds(5), "");
+        var cfg = com.agentoffice.config.RuntimeAiConfig.of(local, props, new com.agentoffice.config.HermesAdminProperties("", "", ""), "fake", "hermes");
+        return new HermesPlanner(props, mapper, new LimitsProperties(3, 20), cfg);
     }
 
     private HermesPlanner planner() { return planner("", Duration.ofSeconds(5)); }
@@ -157,8 +163,9 @@ class HermesPlannerTest {
         assertThat(calls).containsExactly("GET /api/tags");
     }
 
-    @Test void missingBaseUrlFailsAtStartup() {
-        assertThatThrownBy(() -> new HermesPlanner(new HermesProperties(" ", "", "", Duration.ofSeconds(1)), mapper, new LimitsProperties(3, 20)))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("HERMES_URL");
+    @Test void missingBaseUrlFailsWhenPlanning() {
+        // địa chỉ đọc mỗi lần gọi (đổi được trên giao diện) nên thiếu địa chỉ báo lỗi lúc lập kế hoạch, không còn chặn khởi động
+        assertThatThrownBy(() -> build(new HermesProperties(" ", "", "", Duration.ofSeconds(1))).propose(GOAL, AGENTS))
+                .isInstanceOf(PlannerException.class).hasMessageContaining("Hermes");
     }
 }
