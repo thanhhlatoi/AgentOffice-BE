@@ -17,4 +17,7 @@ public interface TaskDependencyRepository extends JpaRepository<TaskDependency, 
     /** Các task đang chờ task này (dependents). */
     @Query("select d from TaskDependency d where d.id.dependsOnTaskId = :dependsOnTaskId")
     List<TaskDependency> findByDependsOnTaskId(UUID dependsOnTaskId);
+
+    @Query("select d from TaskDependency d where d.id.taskId in :ids")
+    List<TaskDependency> findByTaskIds(java.util.Collection<UUID> ids);
 }

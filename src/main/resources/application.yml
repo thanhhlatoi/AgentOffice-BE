@@ -19,7 +19,7 @@ spring:
     default-property-inclusion: non_null
 
 server:
-  port: 8080
+  port: 8082
 
 agentoffice:
   storage:
@@ -44,7 +44,10 @@ agentoffice:
   events:
     relay-interval-ms: 500
   secrets:
-    master-key-base64: ""
+    master-key-base64: ${AGENTOFFICE_MASTER_KEY:}   # 32 byte base64 (openssl rand -base64 32): mã hoá khoá API lưu trong DB; trống = không lưu được khoá từ giao diện
+  owner-token: ${OWNER_TOKEN:}   # mã chủ: bắt buộc để sửa cài đặt AI từ giao diện (header Authorization: Bearer ...); trống = cài đặt chỉ xem
+  settings:
+    allowed-hosts: ${AI_ALLOWED_HOSTS:}   # tên máy ngoài mạng nội bộ được phép đặt làm địa chỉ AI/Hermes (phân cách bằng dấu phẩy); mặc định chỉ LAN/Tailscale/localhost
   limits:
     max-task-depth: 3         # độ sâu giao việc tối đa (đã chốt)
     max-tasks-per-goal: 20    # số task tối đa mỗi goal (đã chốt)
@@ -56,7 +59,7 @@ agentoffice:
   hermes-admin:               # hermes_admin.py trên máy Hermes (quản lý bot/profile); trống = tắt, API trả 503
     url: ${HERMES_ADMIN_URL:}
     key: ${HERMES_ADMIN_KEY:}
-    clone-from: ${HERMES_CLONE_FROM:}   # bot mẫu để sao chép khi tạo bot cho agent mới, trống = bot trống
+    clone-from: ${HERMES_CLONE_FROM:}   # bot mẫu sạch (vd tpl_base) để sao chép khi tạo bot cho agent mới, trống = bot trống; BE ghi đè description/SOUL/model, không đụng plugin
     stall-timeout: 300s       # không có sự kiện trong khoảng này = kẹt, tự dừng run
   scheduler:
     enabled: true
@@ -69,7 +72,13 @@ agentoffice:
     on-reject: FAIL_TASK          # FAIL_TASK | RETURN_TO_AGENT
     expiry-scan-ms: 60000
   runner:
+    type: ${AGENT_RUNNER:fake}   # fake | hermes (chạy task bằng bot của agent, xem service/task/HermesAgentRunner)
     fake-delay-ms: 30
+    poll-ms: 2000
+    max-wait-seconds: 7200       # gồm cả thời gian xếp hàng trên máy Hermes
+  security:
+    enabled: true
+    api-key: ${AGENTOFFICE_API_KEY:}   # header X-Api-Key, ≥16 ký tự; trống = từ chối mọi request
 
 management:
   endpoints:

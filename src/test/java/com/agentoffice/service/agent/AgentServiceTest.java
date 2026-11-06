@@ -35,4 +35,26 @@ class AgentServiceTest {
         String p = AgentService.profileName("a".repeat(200), agent());
         assertThat(p).matches(VALID).hasSizeLessThanOrEqualTo(64).endsWith("-3fa85f64");
     }
+
+    private static AgentService svc() {
+        var local = new com.agentoffice.config.LocalLlmProperties("http://x/v1", "", "ollama", "qwen3.6-64k:latest",
+                java.util.Map.of("local.small", "qwen3.6-64k:latest"), java.time.Duration.ofSeconds(5), "");
+        return new AgentService(null, null, null, null, null, local, null);
+    }
+
+    @Test
+    void model_cua_bot_suy_tu_model_profile() {
+        AgentService s = svc();
+        assertThat(s.botModel("local.small")).isEqualTo("qwen3.6-64k:latest");          // bí danh -> model thật
+        assertThat(s.botModel("qwen3.6:35b-a3b-q4_K_M")).isEqualTo("qwen3.6:35b-a3b-q4_K_M");   // đã là model thật
+        assertThat(s.botModel("hf.co/x/y:Q4")).isEqualTo("hf.co/x/y:Q4");
+        assertThat(s.botModel("claude-sonnet-5-5")).isNull();                          // không chạy được trên Ollama -> giữ model bot mẫu
+        assertThat(s.botModel(null)).isNull();
+    }
+
+    @Test
+    void soul_dung_nguyen_van_system_prompt_hoac_tu_dung_cau_gioi_thieu() {
+        assertThat(AgentService.soul("Linh", "Planner", "Kế toán", "Bạn luôn trả lời ngắn.")).isEqualTo("Bạn luôn trả lời ngắn.");
+        assertThat(AgentService.soul("Linh", "Planner", "Kế toán", "  ")).isEqualTo("Bạn là Linh, vai trò Planner, thuộc phòng Kế toán.");
+    }
 }

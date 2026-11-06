@@ -27,7 +27,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -36,14 +35,13 @@ import org.springframework.stereotype.Component;
  * ponytail: run không được lưu DB nên backend restart giữa chừng sẽ không theo dõi lại; cần thì thêm bảng run như bot_tasks.
  */
 @Component
-@ConditionalOnProperty(name = "agentoffice.planner", havingValue = "hermes")
 public class HermesPlanner implements Planner {
     private static final Logger log = LoggerFactory.getLogger(HermesPlanner.class);
     private static final int MAX_RECONNECTS = 5;
     private static final Duration SHORT_TIMEOUT = Duration.ofSeconds(5);
     private static final String END_OF_STREAM = "\0";
 
-    private final String baseUrl;
+    private final com.agentoffice.config.RuntimeAiConfig cfg;
     private final String apiKey;
     private final String modelCheckUrl;
     private final Duration stallTimeout;
@@ -58,9 +56,8 @@ public class HermesPlanner implements Planner {
         boolean received;
     }
 
-    public HermesPlanner(HermesProperties props, ObjectMapper mapper, LimitsProperties limits) {
-        if (props.baseUrl().isBlank()) throw new IllegalStateException("agentoffice.planner=hermes cần agentoffice.hermes.base-url (HERMES_URL)");
-        this.baseUrl = props.baseUrl().trim().replaceAll("/+$", "");
+    public HermesPlanner(HermesProperties props, ObjectMapper mapper, LimitsProperties limits, com.agentoffice.config.RuntimeAiConfig cfg) {
+        this.cfg = cfg;
         this.apiKey = props.apiKey().trim();
         this.modelCheckUrl = props.modelCheckUrl().trim();
         this.stallTimeout = props.stallTimeout();
@@ -209,6 +206,8 @@ public class HermesPlanner implements Planner {
     }
 
     private HttpRequest.Builder request(String path) {
+        String baseUrl = cfg.get().hermesBaseUrl().trim().replaceAll("/+$", "");   // đọc mỗi lần gọi: đổi địa chỉ trên giao diện có hiệu lực ngay
+        if (baseUrl.isEmpty()) throw new PlannerException("Chưa khai báo địa chỉ Hermes (HERMES_URL hoặc Cài đặt AI)");
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(stallTimeout);
         if (!apiKey.isEmpty()) b.header("Authorization", "Bearer " + apiKey);
         return b;

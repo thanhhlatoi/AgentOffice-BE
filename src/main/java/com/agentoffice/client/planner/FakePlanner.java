@@ -6,12 +6,10 @@ import com.agentoffice.service.task.Planner;
 import com.agentoffice.entity.task.Goal;
 import com.agentoffice.domain.task.Priority;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /** Planner tất định cho dev/test (mặc định khi chưa cấu hình): 2 task nối tiếp, giao cho agent đầu và agent cuối. */
 @Component
-@ConditionalOnProperty(name = "agentoffice.planner", havingValue = "fake", matchIfMissing = true)
 public class FakePlanner implements Planner {
     @Override
     public Plan propose(Goal goal, List<AgentInfo> agents) {

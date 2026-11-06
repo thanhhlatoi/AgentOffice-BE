@@ -46,8 +46,11 @@ class OpenAiCompatLlmClientTest {
 
     private OpenAiCompatLlmClient client(String apiKey) {
         String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/";
-        return new OpenAiCompatLlmClient(new LocalLlmProperties(url, apiKey, "ollama", "qwen3:4b",
-                Map.of("local.strong", "qwen3:32b"), Duration.ofSeconds(5), "none"), mapper);
+        var local = new LocalLlmProperties(url, apiKey, "ollama", "qwen3:4b",
+                Map.of("local.strong", "qwen3:32b"), Duration.ofSeconds(5), "none");
+        var cfg = com.agentoffice.config.RuntimeAiConfig.of(local, new com.agentoffice.config.HermesProperties("", "", "", Duration.ofSeconds(1)),
+                new com.agentoffice.config.HermesAdminProperties("", "", ""), "local", "fake");
+        return new OpenAiCompatLlmClient(cfg, mapper);
     }
 
     private static LlmRequest req(String model) {

@@ -11,18 +11,18 @@ import com.agentoffice.client.llm.LlmRequest.Msg;
 import com.agentoffice.entity.task.Goal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /** Planner dự phòng: nhờ LLM trả JSON kế hoạch. Đầu ra LLM LUÔN được PlanValidator kiểm trước khi dùng. */
 @Component
-@ConditionalOnProperty(name = "agentoffice.planner", havingValue = "llm")
 public class LlmPlanner implements Planner {
     private final MeteredLlmClient llm;
     private final ObjectMapper mapper;
     private final LimitsProperties limits;
+    private final com.agentoffice.config.RuntimeAiConfig cfg;
 
-    public LlmPlanner(MeteredLlmClient llm, ObjectMapper mapper, LimitsProperties limits) {
+    public LlmPlanner(MeteredLlmClient llm, ObjectMapper mapper, LimitsProperties limits, com.agentoffice.config.RuntimeAiConfig cfg) {
+        this.cfg = cfg;
         this.llm = llm;
         this.mapper = mapper;
         this.limits = limits;
@@ -35,7 +35,7 @@ public class LlmPlanner implements Planner {
     public Plan revise(Goal goal, List<AgentInfo> agents, List<String> feedback) {
         List<Msg> msgs = List.of(new Msg("system", PlanPrompt.system(limits)),
                 new Msg("user", PlanPrompt.user(goal, agents, feedback, mapper)));
-        String text = llm.complete(new LlmRequest("planner", msgs, 2000, CallContext.forPlanner(goal.getId()))).text();
+        String text = llm.complete(new LlmRequest("planner", msgs, cfg.get().maxOutputTokens(), CallContext.forPlanner(goal.getId()))).text();
         return PlanPrompt.parse(text, mapper);
     }
 }

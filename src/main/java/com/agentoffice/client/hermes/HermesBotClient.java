@@ -26,17 +26,20 @@ public class HermesBotClient {
     private static final Logger log = LoggerFactory.getLogger(HermesBotClient.class);
 
     private final String baseUrl;
-    private final String key;
+    private final com.agentoffice.config.RuntimeAiConfig cfg;
     private final ObjectMapper mapper;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
-    public HermesBotClient(HermesAdminProperties props, ObjectMapper mapper) {
+    public HermesBotClient(HermesAdminProperties props, ObjectMapper mapper, com.agentoffice.config.RuntimeAiConfig cfg) {
+        this.cfg = cfg;
         this.baseUrl = props.url().trim().replaceAll("/+$", "");
-        this.key = props.key().trim();
         this.mapper = mapper;
     }
 
-    public boolean configured() { return !baseUrl.isEmpty() && !key.isEmpty(); }
+    /** Khoá admin đọc mỗi lần gọi: đổi "token admin" trên giao diện có hiệu lực ngay. */
+    private String key() { return cfg.get().hermesAdminKey(); }
+
+    public boolean configured() { return !baseUrl.isEmpty() && !key().isEmpty(); }
 
     public JsonNode list() { return call("GET", "/profiles", null); }
 
@@ -65,9 +68,56 @@ public class HermesBotClient {
         return result;
     }
 
+    /** Xoá hẳn bot (config, khoá API, bộ nhớ, phiên, skill của bot đó). Máy Hermes bắt gửi ?confirm=<tên> để chống bấm nhầm. */
+    public JsonNode delete(String name) {
+        JsonNode result = call("DELETE", "/profiles/" + name + "?confirm=" + name, null);
+        log.warn("Đã xoá bot Hermes '{}'", name);
+        return result;
+    }
+
+    public JsonNode skills(String name) { return call("GET", "/profiles/" + name + "/skills", null); }
+
+    public JsonNode skill(String name, String skill) { return call("GET", "/profiles/" + name + "/skills/" + skill, null); }
+
+    /** body = {"enabled": {"ten-skill": true|false, ...}}. */
+    public JsonNode setSkillsEnabled(String name, JsonNode body) {
+        JsonNode result = call("PUT", "/profiles/" + name + "/skills", body);
+        log.info("Bật/tắt skill của bot '{}': {}", name, result.path("changed"));
+        return result;
+    }
+
+    /** body = {enabled?: bool, content?: "SKILL.md mới"}. */
+    public JsonNode updateSkill(String name, String skill, JsonNode body) {
+        JsonNode result = call("PUT", "/profiles/" + name + "/skills/" + skill, body);
+        log.info("Sửa skill '{}' của bot '{}': {}", skill, name, result.path("changed"));
+        return result;
+    }
+
     public JsonNode restart(String name) {
         JsonNode result = call("POST", "/profiles/" + name + "/restart", null);
         log.info("Khởi động lại gateway bot Hermes '{}'", name);
+        return result;
+    }
+
+    /** Giao việc cho bot: chạy một lượt trên máy Hermes, không cần gateway. Gửi lại cùng runId thì nhận run cũ. */
+    public JsonNode startRun(String name, String runId, String prompt) {
+        return call("POST", "/profiles/" + name + "/runs", mapper.createObjectNode().put("runId", runId).put("prompt", prompt));
+    }
+
+    /** status: queued|running|succeeded|failed|timeout|cancelled, kèm output, error, tokens. */
+    public JsonNode run(String runId) { return call("GET", "/runs/" + runId, null); }
+
+    public JsonNode stopRun(String runId) { return call("POST", "/runs/" + runId + "/stop", null); }
+
+    /** Kênh trên các máy qua plugin ytb của bot: đi thẳng, không qua AI. Bot không có plugin thì 404. */
+    public JsonNode channels(String name) { return call("GET", "/profiles/" + name + "/channels", null); }
+
+    /** action = open | close: mở/đóng Chrome của kênh. machine = null thì tự tìm; trùng tên ở 2 máy thì 409. */
+    public JsonNode channelAction(String name, String action, String channel, String machine) {
+        var body = mapper.createObjectNode().put("name", channel);
+        if (machine != null) body.put("machine", machine);
+        JsonNode result = call("POST", "/profiles/" + name + "/channels/" + action, body);
+        log.info("Kênh {} {} qua bot '{}': {}", channel, action, name, result.path("status"));
         return result;
     }
 
@@ -83,7 +133,7 @@ public class HermesBotClient {
         try {
             HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + path))
                     .timeout(Duration.ofSeconds(150)) // restart gateway có thể chậm
-                    .header("Authorization", "Bearer " + key);
+                    .header("Authorization", "Bearer " + key());
             if (body != null) b.header("Content-Type", "application/json");
             b.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                     : HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
@@ -93,7 +143,9 @@ public class HermesBotClient {
             if (code / 100 == 2) return out;
             String msg = out.path("error").asText("Hermes admin lỗi HTTP " + code);
             if (code == 400) throw new AppException(ErrorCode.VALIDATION, msg);
+            if (code == 409) throw new AppException(ErrorCode.CONFLICT, msg);
             if (code == 404) throw new NotFoundException("bot Hermes", path);
+            if (code == 503) throw new AppException(ErrorCode.HERMES_UNAVAILABLE, msg); // máy điều khiển kênh tắt: nói rõ máy nào
             log.warn("Hermes admin {} {} -> HTTP {}: {}", method, path, code, msg);
             throw new AppException(ErrorCode.HERMES_UNAVAILABLE, "Máy Hermes từ chối (HTTP " + code + ")");
         } catch (IOException e) {

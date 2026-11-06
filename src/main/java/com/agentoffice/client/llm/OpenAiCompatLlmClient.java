@@ -1,6 +1,5 @@
 package com.agentoffice.client.llm;
 
-import com.agentoffice.config.LocalLlmProperties;
 import com.agentoffice.exception.AppException;
 import com.agentoffice.exception.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,8 +13,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,38 +20,36 @@ import org.springframework.stereotype.Component;
  * Bật bằng agentoffice.llm.provider=local. Mọi lỗi mạng/HTTP thành AppException(LLM_UNAVAILABLE) để MeteredLlmClient ghi usage lỗi.
  */
 @Component
-@Qualifier("raw")
-@ConditionalOnProperty(name = "agentoffice.llm.provider", havingValue = "local")
 public class OpenAiCompatLlmClient implements LlmClient {
     /** Model suy luận (qwen3, deepseek-r1...) có thể nhét phần nghĩ vào content: bỏ đi, chỉ giữ câu trả lời. */
     private static final Pattern THINK = Pattern.compile("(?s)<think>.*?</think>\\s*");
 
-    private final LocalLlmProperties props;
-    private final String baseUrl;
+    private final com.agentoffice.config.RuntimeAiConfig cfg;
     private final ObjectMapper mapper;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
-    public OpenAiCompatLlmClient(LocalLlmProperties props, ObjectMapper mapper) {
-        this.props = props;
-        this.baseUrl = props.baseUrl().trim().replaceAll("/+$", "");
+    public OpenAiCompatLlmClient(com.agentoffice.config.RuntimeAiConfig cfg, ObjectMapper mapper) {
+        this.cfg = cfg;
         this.mapper = mapper;
     }
 
     @Override
-    public String provider() { return props.providerName(); }
+    public String provider() { return cfg.get().providerName(); }
 
     @Override
     public LlmResponse complete(LlmRequest req) {
+        var c = cfg.get();   // ảnh chụp cấu hình: cả cuộc gọi dùng nhất quán một bộ giá trị, đổi trên giao diện có hiệu lực từ cuộc gọi sau
+        String baseUrl = c.chatBaseUrl().trim().replaceAll("/+$", "");
         String model = resolveModel(req.model());
         try {
             ObjectNode body = mapper.createObjectNode().put("model", model).put("stream", false).put("max_tokens", req.maxOutputTokens());
-            if (!props.reasoningEffort().isBlank()) body.put("reasoning_effort", props.reasoningEffort().trim());
+            if (!c.reasoningEffort().isBlank()) body.put("reasoning_effort", c.reasoningEffort().trim());
             ArrayNode msgs = body.putArray("messages");
             for (LlmRequest.Msg m : req.messages()) msgs.addObject().put("role", m.role()).put("content", m.content());
 
-            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + "/chat/completions")).timeout(props.timeout())
+            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(baseUrl + "/chat/completions")).timeout(c.timeout())
                     .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
-            if (!props.apiKey().isBlank()) b.header("Authorization", "Bearer " + props.apiKey().trim());
+            if (!c.chatApiKey().isBlank()) b.header("Authorization", "Bearer " + c.chatApiKey().trim());
 
             HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
             if (r.statusCode() / 100 != 2) throw unavailable("Máy AI local từ chối (HTTP " + r.statusCode() + ")", null);
@@ -81,10 +76,11 @@ public class OpenAiCompatLlmClient implements LlmClient {
 
     /** Alias (profile) -> model thật; tên đã là model thật (có ':' hoặc '/', vd qwen3:4b) giữ nguyên; còn lại dùng model mặc định. */
     String resolveModel(String requested) {
-        String alias = props.modelAliases().get(requested);
+        var c = cfg.get();
+        String alias = c.aliases().get(requested);
         if (alias != null && !alias.isBlank()) return alias;
         if (requested != null && (requested.contains(":") || requested.contains("/"))) return requested;
-        return props.defaultModel();
+        return c.model();
     }
 
     private static AppException unavailable(String msg, Throwable cause) {
