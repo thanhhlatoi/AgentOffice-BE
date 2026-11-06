@@ -20,6 +20,16 @@ services:
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - miniodata:/data
+  # LLM gateway (9Router): docker compose --profile gateway up -d. Dashboard http://localhost:20128, tạo combo + API key ở đó.
+  9router:
+    image: decolua/9router:latest
+    profiles: ["gateway"]
+    environment:
+      INITIAL_PASSWORD: ${INITIAL_PASSWORD:-}   # không dùng :? để compose mặc định không đòi biến này
+    ports:
+      - "20128:20128"
+    volumes:
+      - ./9router-data:/app/data
 volumes:
   pgdata:
   miniodata:

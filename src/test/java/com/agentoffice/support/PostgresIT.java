@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -21,6 +22,7 @@ import org.testcontainers.utility.DockerImageName;
 /** Base cho test tích hợp: 1 Postgres (pgvector) dùng chung cả JVM, DB được dọn sạch trước mỗi test. */
 @SpringBootTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "agentoffice.llm.provider=fake")   // .env của dev (LLM_PROVIDER) không được làm test gọi gateway thật
 @Import(TestClockConfig.class)
 public abstract class PostgresIT {
     public static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>(

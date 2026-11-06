@@ -37,7 +37,10 @@ public enum ErrorCode {
     // ---- usage / tool (dành cho các prompt sau)
     BUDGET_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY),
     TOOL_UNKNOWN(HttpStatus.NOT_FOUND),
-    TOOL_DENIED_SCOPE(HttpStatus.FORBIDDEN);
+    TOOL_DENIED_SCOPE(HttpStatus.FORBIDDEN),
+
+    // ---- llm
+    LLM_GATEWAY_ERROR(HttpStatus.BAD_GATEWAY);
 
     private final HttpStatus status;
 

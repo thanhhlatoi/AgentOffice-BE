@@ -29,7 +29,12 @@ agentoffice:
     bucket: ${MINIO_BUCKET:agent-office}
   cors-origins: http://localhost:5173
   llm:
-    provider: fake            # fake | openai-compatible (TODO tự viết)
+    provider: ${LLM_PROVIDER:fake}   # fake | openai-compatible (9Router); đặt LLM_PROVIDER trong .env
+    gateway:                  # chỉ dùng khi provider=openai-compatible; thiếu base-url thì app dừng lúc khởi động
+      base-url: ${NINEROUTER_URL:}      # vd http://localhost:20128 (không kèm /v1)
+      api-key: ${NINEROUTER_API_KEY:}
+      connect-timeout: 5s
+      read-timeout: 120s
   events:
     relay-interval-ms: 500
   secrets:
