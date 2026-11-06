@@ -41,6 +41,7 @@ public enum ErrorCode {
     TOOL_DENIED_SCOPE(HttpStatus.FORBIDDEN),
 
     // ---- LLM
+    LLM_GATEWAY_ERROR(HttpStatus.BAD_GATEWAY),
     LLM_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
 
     // ---- hermes admin (bot/profile trên máy Hermes)

@@ -1,6 +1,8 @@
 package com.agentoffice.client.llm;
 
 import com.agentoffice.config.RuntimeAiConfig;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -14,18 +16,25 @@ public class SwitchingLlmClient implements LlmClient {
     private final RuntimeAiConfig cfg;
     private final FakeLlmClient fake;
     private final OpenAiCompatLlmClient local;
+    private final LlmClient gateway;
 
-    public SwitchingLlmClient(RuntimeAiConfig cfg, FakeLlmClient fake, OpenAiCompatLlmClient local) {
+    /** gateway có bean chỉ khi agentoffice.llm.provider=openai-compatible (9Router, cố định theo .env): khi đó thắng cả fake lẫn local. */
+    public SwitchingLlmClient(RuntimeAiConfig cfg, FakeLlmClient fake, OpenAiCompatLlmClient local,
+                              ObjectProvider<OpenAiCompatibleLlmClient> gateway) {
         this.cfg = cfg;
         this.fake = fake;
         this.local = local;
+        this.gateway = gateway.getIfAvailable();
     }
 
-    private LlmClient current() { return cfg.get().local() ? local : fake; }
+    private LlmClient current() { return gateway != null ? gateway : cfg.get().local() ? local : fake; }
 
     @Override
     public String provider() { return current().provider(); }
 
     @Override
     public LlmResponse complete(LlmRequest req) { return current().complete(req); }
+
+    @Override
+    public List<LlmModel> models() { return current().models(); }
 }

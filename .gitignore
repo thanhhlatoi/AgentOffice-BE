@@ -2,6 +2,7 @@ target/
 .idea/
 *.iml
 .env
+9router-data/
 # Environment files
 .env.*
 !.env.example

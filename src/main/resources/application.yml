@@ -29,7 +29,12 @@ agentoffice:
     bucket: ${MINIO_BUCKET:agent-office}
   cors-origins: http://localhost:5173
   llm:
-    provider: ${LLM_PROVIDER:fake}   # fake | local (máy AI local chuẩn OpenAI: Ollama, LM Studio, vLLM...)
+    provider: ${LLM_PROVIDER:fake}   # fake | local (máy AI local chuẩn OpenAI: Ollama, LM Studio, vLLM...) | openai-compatible (9Router, cố định theo .env, không đổi từ giao diện)
+    gateway:                  # chỉ dùng khi provider=openai-compatible; thiếu base-url thì app dừng lúc khởi động
+      base-url: ${NINEROUTER_URL:}      # vd http://localhost:20128 (không kèm /v1)
+      api-key: ${NINEROUTER_API_KEY:}
+      connect-timeout: 5s
+      read-timeout: 120s
     local:
       base-url: ${LOCAL_LLM_URL:http://localhost:11434/v1}   # Ollama mặc định; gồm cả /v1
       api-key: ${LOCAL_LLM_API_KEY:}                         # Ollama không cần
