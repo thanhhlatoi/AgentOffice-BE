@@ -67,6 +67,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private ResponseEntity<Object> respond(ErrorCode code, String message, java.util.Map<String, Object> details, Throwable cause) {
         if (code.status().is5xxServerError()) log.error("{} {}", code, message, cause);       // có stacktrace
         else log.info("{} {}", code, message);
-        return ResponseEntity.status(code.status()).body(new ApiError(code.name(), message, CorrelationIdFilter.current(), details));
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(code.status());
+        if (code == ErrorCode.RATE_LIMITED && details != null && details.get("retryAfterSeconds") != null)
+            response.header(HttpHeaders.RETRY_AFTER, String.valueOf(details.get("retryAfterSeconds")));
+        return response.body(new ApiError(code.name(), message, CorrelationIdFilter.current(), details));
     }
 }

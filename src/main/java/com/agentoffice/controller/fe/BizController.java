@@ -1,5 +1,9 @@
 package com.agentoffice.controller.fe;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.dto.fe.BizDto;
 import com.agentoffice.dto.fe.OfficeDto;
 import com.agentoffice.exception.AppException;
@@ -43,7 +47,7 @@ public class BizController {
     public OfficeDto.Task task(@PathVariable UUID id) { return biz.taskById(id); }
 
     @GetMapping("/tasks/{id}/history")
-    public List<BizDto.History> history(@PathVariable UUID id) { return biz.taskHistory(id); }
+    public List<BizDto.History> history(@PathVariable UUID id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(biz.taskHistory(id), page, size, res); }
 
     @PostMapping("/tasks/{id}/assign")
     public OfficeDto.Task assign(@PathVariable UUID id, @RequestBody BizDto.AssignBody b) { return biz.assign(id, b.agentId()); }
@@ -55,23 +59,25 @@ public class BizController {
     public BizDto.Page<OfficeDto.Task> column(@PathVariable String column, @RequestParam(required = false) UUID projectId,
                                             @RequestParam(required = false) UUID agentId, @RequestParam(required = false) UUID departmentId,
                                             @RequestParam(required = false) String priority, @RequestParam(required = false) String q,
+                                            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                                            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
                                             @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "50") int limit) {
-        return biz.kanbanPage(column, projectId, agentId, departmentId, priority, q, cursor, Math.max(1, Math.min(limit, 200)));
+        return biz.kanbanPage(column, projectId, agentId, departmentId, priority, q, from, to, cursor, Math.max(1, Math.min(limit, 200)));
     }
 
     // ---- dự án
     @GetMapping("/projects")
     public List<BizDto.Project> projects(@RequestParam(required = false) String status, @RequestParam(required = false) String departmentId,
-                                           @RequestParam(required = false) String q) { return biz.projects(status, departmentId, q); }
+                                           @RequestParam(required = false) String q, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(biz.projects(status, departmentId, q), page, size, res); }
 
     @GetMapping("/projects/{id}")
     public BizDto.Project project(@PathVariable UUID id) { return biz.project(id); }
 
     @GetMapping("/projects/{id}/snapshots")
-    public List<BizDto.Snapshot> snapshots(@PathVariable UUID id) { return biz.snapshots(id); }
+    public List<BizDto.Snapshot> snapshots(@PathVariable UUID id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(biz.snapshots(id), page, size, res); }
 
     @GetMapping("/projects/{id}/events")
-    public List<BizDto.Activity> activity(@PathVariable UUID id) { return biz.projectActivity(id); }
+    public List<BizDto.Activity> activity(@PathVariable UUID id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(biz.projectActivity(id), page, size, res); }
 
     @PostMapping("/projects")
     @ResponseStatus(HttpStatus.CREATED)
@@ -114,7 +120,7 @@ public class BizController {
     }
 
     @GetMapping("/budgets/{id}/changes")
-    public List<BizDto.BudgetChange> changes(@PathVariable UUID id) { return biz.budgetChanges(id); }
+    public List<BizDto.BudgetChange> changes(@PathVariable UUID id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(biz.budgetChanges(id), page, size, res); }
 
     // ---- số liệu phòng
     @GetMapping("/departments/{id}/stats")

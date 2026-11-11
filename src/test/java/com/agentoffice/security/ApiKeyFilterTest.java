@@ -20,7 +20,7 @@ class ApiKeyFilterTest {
         return passed;
     }
 
-    private static ApiKeyFilter filter() { return new ApiKeyFilter(true, KEY, new ObjectMapper()); }
+    private static ApiKeyFilter filter() { return new ApiKeyFilter(true, KEY, "", new ObjectMapper()); }
 
     private static MockHttpServletRequest get(String path) { return new MockHttpServletRequest("GET", path); }
 
@@ -59,11 +59,11 @@ class ApiKeyFilterTest {
         for (String key : new String[] {"", "ngan"}) {
             MockHttpServletRequest req = get("/api/fe/agents");
             req.addHeader(ApiKeyFilter.HEADER, key);
-            assertThat(passes(new ApiKeyFilter(true, key, new ObjectMapper()), req)).isFalse();
+            assertThat(passes(new ApiKeyFilter(true, key, "", new ObjectMapper()), req)).isFalse();
         }
     }
 
     @Test void tatBangCauHinhThiKhongKiemTra() throws Exception {
-        assertThat(passes(new ApiKeyFilter(false, "", new ObjectMapper()), get("/api/fe/agents"))).isTrue();
+        assertThat(passes(new ApiKeyFilter(false, "", "", new ObjectMapper()), get("/api/fe/agents"))).isTrue();
     }
 }

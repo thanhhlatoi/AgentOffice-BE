@@ -8,6 +8,7 @@ import com.agentoffice.service.agent.AgentService;
 import com.agentoffice.util.Slugs;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class DepartmentService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DepartmentService.class);
     private static final Pattern COLOR = Pattern.compile("^#[0-9a-fA-F]{6}$");
     private static final Pattern PROP = Pattern.compile("^[a-z0-9-]{1,40}$");
     private static final Set<String> RESERVED = Set.of("khu-chung", "chua-phan-phong");
@@ -73,6 +75,22 @@ public class DepartmentService {
         String role = in.headRole() == null || in.headRole().isBlank() ? "Trưởng phòng " + c.name : in.headRole().trim();
         UUID head = agents.create(in.headName().trim(), role, c.name, new AgentService.Profile(null, null, c.color, null)).getId();
         jdbc.update("UPDATE department SET head_agent_id = ? WHERE id = ?", head, deptId);
+    }
+
+    /**
+     * POST /departments/{id}/head: đặt trưởng phòng. department.head_agent_id là nguồn DUY NHẤT của Agent.isHead (ViewService suy ra),
+     * nên chỉ cần ghi một chỗ là mỗi phòng đúng một trưởng phòng. 400 nếu agent không thuộc phòng.
+     */
+    @Transactional
+    public void setHead(UUID deptId, UUID agentId) {
+        String name = nameOf(deptId);
+        List<Map<String, Object>> a = jdbc.queryForList("SELECT department_id, archived_at FROM agent WHERE id = ?", agentId);
+        if (a.isEmpty() || a.get(0).get("archived_at") != null) throw new NotFoundException("agent", agentId);
+        if (!deptId.equals(a.get(0).get("department_id")))
+            throw new AppException(ErrorCode.VALIDATION, "Agent không thuộc phòng " + name + ", hãy chuyển agent vào phòng trước");
+        jdbc.update("UPDATE department SET head_agent_id = NULL WHERE head_agent_id = ? AND id <> ?", agentId, deptId);   // dữ liệu cũ lệch
+        jdbc.update("UPDATE department SET head_agent_id = ? WHERE id = ?", agentId, deptId);
+        log.info("phòng {} đổi trưởng phòng thành agent {}", name, agentId);
     }
 
     /** Agent trong phòng không bị xoá: về "chưa phân phòng". */

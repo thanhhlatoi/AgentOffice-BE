@@ -1,5 +1,9 @@
 package com.agentoffice.controller.approval;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.domain.approval.ApprovalKind;
 import com.agentoffice.domain.approval.ApprovalStatus;
 import com.agentoffice.domain.approval.RiskLevel;
@@ -40,8 +44,8 @@ public class ApprovalController {
     }
 
     @GetMapping
-    public List<ApprovalDto> list(@RequestParam(defaultValue = "PENDING") ApprovalStatus status) {
-        return approvals.findByStatusOrderByCreatedAtAsc(status).stream().map(mapper::toDto).toList();
+    public List<ApprovalDto> list(@RequestParam(defaultValue = "PENDING") ApprovalStatus status, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) {
+        return Paging.slice(approvals.findByStatusOrderByCreatedAtAsc(status).stream().map(mapper::toDto).toList(), page, size, res);
     }
 
     @PostMapping("/{id}/approve")

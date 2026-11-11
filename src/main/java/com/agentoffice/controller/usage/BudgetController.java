@@ -1,5 +1,9 @@
 package com.agentoffice.controller.usage;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.domain.usage.BudgetScope;
 import com.agentoffice.dto.usage.BudgetDto;
 import com.agentoffice.mapper.usage.BudgetMapper;
@@ -58,5 +62,5 @@ public class BudgetController {
     }
 
     @GetMapping("/{id}/changes")
-    public List<BudgetDto.Change> changes(@PathVariable UUID id) { return mapper.toChanges(budgets.changes(id)); }
+    public List<BudgetDto.Change> changes(@PathVariable UUID id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(mapper.toChanges(budgets.changes(id)), page, size, res); }
 }

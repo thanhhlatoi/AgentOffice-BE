@@ -28,6 +28,7 @@
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-websocket</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-redis</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
@@ -73,7 +74,7 @@
         <configuration>
           <includes><include>**/*Test.java</include><include>**/*IT.java</include></includes>
           <!-- Testcontainers 1.19 mặc định Docker API 1.32; Docker >= 29 từ chối dưới 1.40 -->
-          <systemPropertyVariables><api.version>1.44</api.version><agentoffice.security.enabled>false</agentoffice.security.enabled><agentoffice.runner.type>fake</agentoffice.runner.type></systemPropertyVariables>
+          <systemPropertyVariables><api.version>1.44</api.version><agentoffice.security.enabled>false</agentoffice.security.enabled><agentoffice.runner.type>fake</agentoffice.runner.type><agentoffice.report.enabled>false</agentoffice.report.enabled></systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

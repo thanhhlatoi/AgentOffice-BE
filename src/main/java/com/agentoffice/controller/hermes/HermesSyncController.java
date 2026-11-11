@@ -112,6 +112,28 @@ public class HermesSyncController {
         return service.channelAction(id, action, name.asText(), machine);
     }
 
+    // ------------------------------------------------------------------ lịch tự động (tab Lịch trong FE)
+    private static final java.util.Set<String> SCHEDULE_FIELDS = java.util.Set.of("channel", "days", "count");
+
+    @GetMapping("/agents/{id}/hermes/schedule")
+    public com.fasterxml.jackson.databind.JsonNode schedule(@PathVariable UUID id) { return service.schedule(id); }
+
+    /** Đổi lịch, không qua AI. Bật lịch nghĩa là máy Ubuntu tự đăng video thật. Cố tình không có run-now và --all. */
+    @PostMapping("/agents/{id}/hermes/schedule/{action:on|off|pause|resume|set-count|skip-today}")
+    public com.fasterxml.jackson.databind.JsonNode scheduleAction(@PathVariable UUID id, @PathVariable String action,
+                                                                 @RequestBody com.fasterxml.jackson.databind.JsonNode body) {
+        if (!body.isObject()) throw bad("Body phải là object");
+        body.fieldNames().forEachRemaining(f -> {
+            if (!SCHEDULE_FIELDS.contains(f)) throw bad("Không có trường: " + f);
+        });
+        var channel = body.path("channel");
+        if (!channel.isMissingNode() && (!channel.isTextual() || channel.asText().isBlank() || channel.asText().startsWith("-") || channel.asText().length() > 100))
+            throw bad("channel không hợp lệ");
+        for (String f : new String[] {"days", "count"})
+            if (body.has(f) && !body.get(f).isInt()) throw bad(f + " phải là số nguyên");
+        return service.scheduleAction(id, action, body);
+    }
+
     @PostMapping("/agents/{id}/hermes/restart")
     public HermesSyncService.AgentSync restart(@PathVariable UUID id) { return service.restart(id); }
 }

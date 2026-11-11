@@ -7,6 +7,14 @@ spring:
     url: jdbc:postgresql://localhost:5432/agentoffice
     username: agentoffice
     password: agentoffice
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: 2s
+      timeout: 2s
   jpa:
     open-in-view: false
     hibernate:
@@ -22,6 +30,11 @@ server:
   port: 8082
 
 agentoffice:
+  redis:
+    enabled: ${REDIS_ENABLED:false}
+    namespace: ${REDIS_NAMESPACE:agentoffice}
+    dispatcher-lease: 30s
+    cache-ttl: 5s
   storage:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MINIO_ROOT_USER:}
@@ -41,11 +54,15 @@ agentoffice:
       provider-name: ollama                                  # khớp model_price.provider để tính usage
       default-model: ${LOCAL_LLM_MODEL:qwen3:4b}             # dùng khi tên model của request không phải model thật
       model-aliases:                                         # tên model_profile -> model thật trên máy local
-        local.small: ${LOCAL_LLM_MODEL:qwen3:4b}
-        local.strong: ${LOCAL_LLM_MODEL:qwen3:32b}
-        planner: ${LOCAL_LLM_MODEL:qwen3:4b}
+        local.small: ${LOCAL_LLM_SMALL_MODEL:${LOCAL_LLM_MODEL:qwen3:4b}}
+        local.strong: ${LOCAL_LLM_STRONG_MODEL:${LOCAL_LLM_MODEL:qwen3:32b}}
+        planner: ${LOCAL_LLM_PLANNER_MODEL:${LOCAL_LLM_STRONG_MODEL:${LOCAL_LLM_MODEL:qwen3:32b}}}
       timeout: 300s
       reasoning-effort: ${LOCAL_LLM_REASONING_EFFORT:}       # none = tắt suy luận (qwen3.x...); trống = không gửi
+  hermes-llm:
+    # Proxy giữ NINEROUTER_API_KEY ở BE; URL phải truy cập được từ máy Hermes.
+    base-url: ${HERMES_LLM_BASE_URL:}
+    allowed-address: ${HERMES_LLM_ALLOWED_ADDRESS:}
   events:
     relay-interval-ms: 500
   secrets:
@@ -81,11 +98,21 @@ agentoffice:
     fake-delay-ms: 30
     poll-ms: 2000
     max-wait-seconds: 7200       # gồm cả thời gian xếp hàng trên máy Hermes
+  publish:                      # công khai video trên máy Windows bằng lenlich; trống = tắt
+    lenlich-dir: ${LENLICH_DIR:}
+    python: ${LENLICH_PYTHON:}
+    channel-bot: ${HERMES_CHANNEL_BOT:}   # bot quản lý kênh của trang Kênh
+  report:
+    enabled: ${DAILY_REPORT:false}   # báo cáo tiến độ 8h, 17h giờ Việt Nam
+    bot: ${HERMES_REPORT_BOT:}
   security:
     enabled: true
     api-key: ${AGENTOFFICE_API_KEY:}   # header X-Api-Key, ≥16 ký tự; trống = từ chối mọi request
 
 management:
+  health:
+    redis:
+      enabled: ${REDIS_ENABLED:false}
   endpoints:
     web:
       exposure:

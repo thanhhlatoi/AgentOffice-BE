@@ -7,6 +7,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import com.agentoffice.service.redis.RedisCoordinator;
+import java.time.Duration;
 
 /**
  * Dồn lại thứ tự khi có hạng quá dài (do chèn giữa nhiều lần): đánh số lại TOÀN BỘ task theo đúng thứ tự hiện tại, dùng chung
@@ -19,10 +21,12 @@ public class KanbanRankJob {
 
     private final JdbcTemplate jdbc;
     private final SchedulerProperties scheduler;
+    private final RedisCoordinator redis;
 
-    public KanbanRankJob(JdbcTemplate jdbc, SchedulerProperties scheduler) {
+    public KanbanRankJob(JdbcTemplate jdbc, SchedulerProperties scheduler, RedisCoordinator redis) {
         this.jdbc = jdbc;
         this.scheduler = scheduler;
+        this.redis = redis;
     }
 
     @Scheduled(fixedDelayString = "${agentoffice.kanban.rebalance-interval-ms:3600000}", initialDelay = 120000)
@@ -36,6 +40,9 @@ public class KanbanRankJob {
 
     @Transactional
     public int rebalanceIfNeeded() {
+        RedisCoordinator.Lease lease = redis.tryLock("kanban-rebalance", Duration.ofMinutes(5)).orElse(null);
+        if (lease == null) return 0;
+        try {
         Integer longest = jdbc.queryForObject("SELECT coalesce(max(length(kanban_rank)), 0) FROM task", Integer.class);
         if (longest == null || longest <= MAX_RANK_LENGTH) return 0;
         long base = jdbc.queryForObject("SELECT nextval('task_rank_seq')", Long.class);
@@ -45,5 +52,8 @@ public class KanbanRankJob {
                 UPDATE task t SET kanban_rank = lpad((? + o.n)::text, 20, '0')
                 FROM (SELECT id, row_number() OVER (ORDER BY kanban_rank, created_at, id) AS n FROM task) o
                 WHERE o.id = t.id""", base);
+        } finally {
+            redis.unlock(lease);
+        }
     }
 }

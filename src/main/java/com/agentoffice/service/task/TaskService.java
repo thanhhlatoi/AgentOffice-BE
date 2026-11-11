@@ -308,11 +308,21 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public Page<Task> search(TaskStatus status, UUID agentId, UUID goalId, int page, int size) {
-        Specification<Task> spec = (root, q, cb) -> {
+        return search(status, agentId, goalId, null, null, null, page, size);
+    }
+
+    /** from/to: ngày tạo task (gồm cả hai đầu, giờ Việt Nam); q: tìm trong tiêu đề, không phân biệt hoa thường. */
+    @Transactional(readOnly = true)
+    public Page<Task> search(TaskStatus status, UUID agentId, UUID goalId, java.time.LocalDate from, java.time.LocalDate to, String q, int page, int size) {
+        java.time.ZoneId zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        Specification<Task> spec = (root, cq, cb) -> {
             List<Predicate> ps = new ArrayList<>();
             if (status != null) ps.add(cb.equal(root.get("status"), status));
             if (agentId != null) ps.add(cb.equal(root.get("assigneeAgentId"), agentId));
             if (goalId != null) ps.add(cb.equal(root.get("goalId"), goalId));
+            if (from != null) ps.add(cb.greaterThanOrEqualTo(root.<java.time.Instant>get("createdAt"), from.atStartOfDay(zone).toInstant()));
+            if (to != null) ps.add(cb.lessThan(root.<java.time.Instant>get("createdAt"), to.plusDays(1).atStartOfDay(zone).toInstant()));
+            if (q != null && !q.isBlank()) ps.add(cb.like(cb.lower(root.get("title")), "%" + q.strip().toLowerCase(java.util.Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%", '\\'));
             return cb.and(ps.toArray(Predicate[]::new));
         };
         return tasks.findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));

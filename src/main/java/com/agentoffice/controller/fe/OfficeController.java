@@ -1,5 +1,9 @@
 package com.agentoffice.controller.fe;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.dto.fe.OfficeDto;
 import com.agentoffice.exception.AppException;
 import com.agentoffice.exception.ErrorCode;
@@ -53,7 +57,7 @@ public class OfficeController {
     public void deleteDepartment(@PathVariable UUID id) { departments.delete(id); }
 
     @GetMapping("/agents")
-    public List<OfficeDto.Agent> agents() { return view.agents(); }
+    public List<OfficeDto.Agent> agents(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(view.agents(), page, size, res); }
 
     @GetMapping("/agents/{id}")
     public OfficeDto.Agent agent(@PathVariable UUID id) { return view.agent(id); }
@@ -78,7 +82,7 @@ public class OfficeController {
 
     // ------------------------------------------------------------------ tasks
     @GetMapping("/agents/{id}/tasks")
-    public List<OfficeDto.Task> agentTasks(@PathVariable UUID id) { return view.tasksOfAgent(id); }
+    public List<OfficeDto.Task> agentTasks(@PathVariable UUID id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(view.tasksOfAgent(id), page, size, res); }
 
     @PostMapping("/agents/{id}/tasks")
     @ResponseStatus(HttpStatus.CREATED)
@@ -87,7 +91,22 @@ public class OfficeController {
     }
 
     @GetMapping("/tasks")
-    public List<OfficeDto.Task> tasks() { return view.tasks(); }
+    public List<OfficeDto.Task> tasks(@RequestParam(required = false) String status, @RequestParam(required = false) UUID agentId,
+                                      @RequestParam(required = false) String q, @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                                      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(filterTasks(view.tasks(), status, agentId, q, from, to), page, size, res); }
+
+    /** Lọc trước khi phân trang: trạng thái, agent, từ khóa trong tiêu đề, ngày tạo (gồm hai đầu, giờ Việt Nam). */
+    private static List<OfficeDto.Task> filterTasks(List<OfficeDto.Task> all, String status, UUID agentId, String q, java.time.LocalDate from, java.time.LocalDate to) {
+        java.time.ZoneId zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        String needle = q == null ? "" : q.strip().toLowerCase(java.util.Locale.ROOT);
+        return all.stream()
+                .filter(t -> status == null || status.isBlank() || status.equalsIgnoreCase(t.status()))
+                .filter(t -> agentId == null || agentId.toString().equals(t.agentId()))
+                .filter(t -> needle.isEmpty() || (t.title() != null && t.title().toLowerCase(java.util.Locale.ROOT).contains(needle)))
+                .filter(t -> from == null || (t.createdAt() != null && !t.createdAt().isBefore(from.atStartOfDay(zone).toInstant())))
+                .filter(t -> to == null || (t.createdAt() != null && t.createdAt().isBefore(to.plusDays(1).atStartOfDay(zone).toInstant())))
+                .toList();
+    }
 
     @PostMapping("/tasks/{id}/cancel")
     public OfficeDto.Task cancelTask(@PathVariable UUID id) { return view.task(cmd.cancelTask(id)); }
@@ -102,7 +121,7 @@ public class OfficeController {
 
     // ------------------------------------------------------------------ goals
     @GetMapping("/goals")
-    public List<OfficeDto.Goal> goals() { return view.goals(); }
+    public List<OfficeDto.Goal> goals(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(view.goals(), page, size, res); }
 
     @PostMapping("/goals")
     @ResponseStatus(HttpStatus.CREATED)
@@ -131,7 +150,7 @@ public class OfficeController {
 
     // ------------------------------------------------------------------ approvals
     @GetMapping("/approvals")
-    public List<OfficeDto.Approval> approvals(@RequestParam(defaultValue = "PENDING") String status) { return view.approvals(status); }
+    public List<OfficeDto.Approval> approvals(@RequestParam(defaultValue = "PENDING") String status, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(view.approvals(status), page, size, res); }
 
     @PostMapping("/approvals/{id}/approve")
     @SensitiveAction("approval.approve")

@@ -1,6 +1,7 @@
 package com.agentoffice.service.task;
 
 import com.agentoffice.config.SchedulerProperties;
+import com.agentoffice.config.RedisProperties;
 import com.agentoffice.domain.task.AgentRunner;
 import com.agentoffice.domain.task.RunResult;
 import com.agentoffice.domain.task.TaskContext;
@@ -10,6 +11,7 @@ import com.agentoffice.entity.task.Task;
 import com.agentoffice.entity.agent.Agent;
 import com.agentoffice.repository.agent.AgentRepository;
 import com.agentoffice.util.LogContext;
+import com.agentoffice.service.redis.RedisCoordinator;
 import jakarta.annotation.PreDestroy;
 import java.time.Clock;
 import java.util.List;
@@ -41,9 +43,13 @@ public class TaskDispatcher {
     private final Clock clock;
     private final ExecutorService pool;
     private final AtomicInteger inFlight = new AtomicInteger();
+    private final RedisCoordinator redis;
+    private final RedisProperties redisProps;
+    private volatile RedisCoordinator.Lease leader;
 
     public TaskDispatcher(TaskScheduler scheduler, TaskService taskService, GoalService goalService,
-                          AgentRepository agents, AgentRunner runner, SchedulerProperties props, Clock clock) {
+                          AgentRepository agents, AgentRunner runner, SchedulerProperties props, Clock clock,
+                          RedisCoordinator redis, RedisProperties redisProps) {
         this.scheduler = scheduler;
         this.taskService = taskService;
         this.goalService = goalService;
@@ -51,18 +57,26 @@ public class TaskDispatcher {
         this.runner = runner;
         this.props = props;
         this.clock = clock;
-        this.pool = Executors.newFixedThreadPool(Math.max(1, props.maxConcurrentTasks()));
+        this.redis = redis;
+        this.redisProps = redisProps;
+        // tên luồng hiện trong log và thread dump: biết ngay dòng nào do worker chạy task
+        this.pool = Executors.newFixedThreadPool(Math.max(1, props.maxConcurrentTasks()), Thread.ofPlatform().name("task-worker-", 1).factory());
     }
 
     @EventListener(ApplicationReadyEvent.class)
     void recoverOnStartup() {
         if (!props.enabled()) return;
+        if (!leader()) {
+            log.info("Không khôi phục task: instance khác đang giữ Redis dispatcher lease");
+            return;
+        }
         log.info("Khôi phục {} task RUNNING sau restart", scheduler.recoverAfterRestart());
     }
 
     @Scheduled(fixedDelayString = "${agentoffice.scheduler.tick-ms:1000}")
     void scheduledTick() {
         if (!props.enabled()) return;
+        if (!leader()) return;
         tick();
     }
 
@@ -83,6 +97,13 @@ public class TaskDispatcher {
     }
 
     public int inFlight() { return inFlight.get(); }
+
+    private synchronized boolean leader() {
+        if (!redis.enabled()) return true;
+        if (leader != null && redis.renew(leader, redisProps.dispatcherLease())) return true;
+        leader = redis.tryLock("task-dispatcher", redisProps.dispatcherLease()).orElse(null);
+        return leader != null;
+    }
 
     /** Chạy đồng bộ 1 task đang RUNNING (public để test gọi trực tiếp). */
     public void runOne(UUID taskId) {
@@ -110,8 +131,10 @@ public class TaskDispatcher {
             finish(taskId, () -> taskService.waitForBudget(taskId, e.budgetId(), e.neededMicroUsd()));
             return;
         } catch (RuntimeException e) {
-            r = RunResult.failed("Runner ném lỗi: " + e.getClass().getSimpleName());   // không log input
+            log.error("Runner {} ném lỗi khi chạy task", runner.getClass().getSimpleName(), e);   // stack trace, không kèm input task
+            r = RunResult.failed("Runner ném lỗi: " + e.getClass().getSimpleName());
         }
+        log.debug("runner {} trả {}{}", runner.getClass().getSimpleName(), r.outcome(), r.error() == null ? "" : " error=" + r.error());
         if (r.tokensUsed() > 0 && t.getGoalId() != null) goalService.recordTokens(t.getGoalId(), r.tokensUsed());
 
         Task now = taskService.get(taskId);
@@ -143,5 +166,8 @@ public class TaskDispatcher {
     }
 
     @PreDestroy
-    void shutdown() { pool.shutdown(); }
+    void shutdown() {
+        pool.shutdown();
+        if (leader != null) redis.unlock(leader);
+    }
 }

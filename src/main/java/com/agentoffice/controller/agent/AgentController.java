@@ -1,5 +1,9 @@
 package com.agentoffice.controller.agent;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.dto.agent.AgentDto;
 import com.agentoffice.service.agent.AgentService;
 import com.agentoffice.mapper.agent.AgentMapper;
@@ -27,7 +31,7 @@ public class AgentController {
     }
 
     @GetMapping
-    public List<AgentDto> list() { return mapper.toDtos(repo.findAll()); }
+    public List<AgentDto> list(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(mapper.toDtos(repo.findAll()), page, size, res); }
 
     @GetMapping("/{id}")
     public AgentDto get(@PathVariable UUID id) {

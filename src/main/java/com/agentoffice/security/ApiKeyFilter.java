@@ -36,12 +36,16 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     private final boolean enabled;
     private final byte[] key;
     private final ObjectMapper mapper;
+    private final String hermesProxyAddress;
 
     public ApiKeyFilter(@Value("${agentoffice.security.enabled:true}") boolean enabled,
-                        @Value("${agentoffice.security.api-key:}") String key, ObjectMapper mapper) {
+                        @Value("${agentoffice.security.api-key:}") String key,
+                        @Value("${agentoffice.hermes-llm.allowed-address:}") String hermesProxyAddress,
+                        ObjectMapper mapper) {
         String k = key == null ? "" : key.trim();
         this.enabled = enabled;
         this.key = k.length() < MIN_KEY_LENGTH ? new byte[0] : k.getBytes(StandardCharsets.UTF_8);
+        this.hermesProxyAddress = hermesProxyAddress == null ? "" : hermesProxyAddress.trim();
         this.mapper = mapper;
         if (!enabled) log.warn("agentoffice.security.enabled=false: API không có xác thực");
         else if (this.key.length == 0) log.error("Chưa đặt AGENTOFFICE_API_KEY (≥{} ký tự): mọi request sẽ bị từ chối", MIN_KEY_LENGTH);
@@ -50,7 +54,8 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest req) {
         String path = req.getRequestURI();
-        return !enabled || CorsUtils.isPreFlightRequest(req) || path.equals("/actuator/health") || path.startsWith("/actuator/health/");
+        return !enabled || CorsUtils.isPreFlightRequest(req) || path.equals("/actuator/health") || path.startsWith("/actuator/health/")
+                || path.startsWith("/api/hermes-llm/v1/") && req.getRemoteAddr().equals(hermesProxyAddress);
     }
 
     @Override

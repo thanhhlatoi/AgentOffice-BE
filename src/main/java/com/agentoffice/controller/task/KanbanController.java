@@ -34,9 +34,11 @@ public class KanbanController {
     public KanbanDto.Board board(@RequestParam(required = false) UUID projectId, @RequestParam(required = false) UUID goalId,
                                  @RequestParam(required = false) UUID agentId, @RequestParam(required = false) UUID departmentId,
                                  @RequestParam(required = false) Priority priority, @RequestParam(required = false) String q,
+                                 @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                                 @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
                                  @RequestParam(defaultValue = "50") @Min(1) @Max(200) int limit,
                                  @RequestParam(required = false) String column, @RequestParam(required = false) String cursor) {
-        return kanban.board(new KanbanService.Filter(projectId, goalId, agentId, departmentId, priority, q), limit,
+        return kanban.board(new KanbanService.Filter(projectId, goalId, agentId, departmentId, priority, q, from, to), limit,
                 column == null ? null : parse(column), cursor);
     }
 

@@ -47,7 +47,8 @@ class AgentServiceBotTest {
             new HermesAdminProperties("http://h", "k", "tpl_base"), new ObjectMapper(), jdbc,
             new LocalLlmProperties("http://x/v1", "", "ollama", "qwen3.6-64k:latest",
                     Map.of("local.small", "qwen3.6-64k:latest"), Duration.ofSeconds(5), ""),
-            new TransactionTemplate(mock(PlatformTransactionManager.class)));
+            new TransactionTemplate(mock(PlatformTransactionManager.class)),
+            mock(com.agentoffice.service.studio.PromptVersionService.class), "http://be/api/hermes-llm/v1");
     private Agent agent;
 
     @BeforeEach
@@ -58,11 +59,13 @@ class AgentServiceBotTest {
         agent.setModelProfile("local.small");
         when(hermes.configured()).thenReturn(true);
         when(repo.findById(id)).thenReturn(Optional.of(agent));
-        when(repo.save(any())).thenAnswer(i -> {
+        org.mockito.stubbing.Answer<Agent> withId = i -> {
             Agent a = i.getArgument(0);
             if (a.getId() == null) ReflectionTestUtils.setField(a, "id", id);
             return a;
-        });
+        };
+        when(repo.save(any())).thenAnswer(withId);
+        when(repo.saveAndFlush(any())).thenAnswer(withId);
     }
 
     private static AgentService.Profile profile(String model, String color) {

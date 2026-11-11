@@ -12,7 +12,8 @@ public final class KanbanDto {
 
     public record Card(UUID id, String title, UUID assigneeAgentId, String assigneeName, Priority priority, TaskStatus status,
                        UUID projectId, String projectColor, UUID goalId, String goalTitle, Integer progressPct,
-                       long costMicroUsd, long ageSec, String lockedReason, long version, UUID retryOfTaskId) {}
+                       long costMicroUsd, long ageSec, String lockedReason, long version, UUID retryOfTaskId,
+                       java.time.Instant createdAt, java.time.Instant updatedAt) {}
 
     public record Column(String column, long total, List<Card> cards, String nextCursor) {}
 

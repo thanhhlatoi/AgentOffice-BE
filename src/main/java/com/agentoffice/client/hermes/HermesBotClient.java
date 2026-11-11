@@ -121,6 +121,22 @@ public class HermesBotClient {
         return result;
     }
 
+    /** Lịch tự động qua lenlich: online, switch, status, plan. Bot không có plugin lich thì 404. */
+    public JsonNode schedule(String name) { return call("GET", "/profiles/" + name + "/schedule", null); }
+
+    /** action = on | off | pause | resume | set-count | skip-today; body = {channel?, days?, count?}. */
+    public JsonNode scheduleAction(String name, String action, JsonNode body) {
+        JsonNode result = call("POST", "/profiles/" + name + "/schedule/" + action, body);
+        log.warn("Đổi lịch tự động qua bot '{}': {} {}", name, action, body);
+        return result;
+    }
+
+    /** Profile riêng của mọi máy kèm số nháp, lần đăng gần nhất, trạng thái đợt kiểm tra. */
+    public JsonNode channelsOverview(String name) { return call("GET", "/profiles/" + name + "/channels/overview", null); }
+
+    /** Kiểm tra số nháp lần lượt, không đăng. body = {names?: [...]}. */
+    public JsonNode checkChannels(String name, JsonNode body) { return call("POST", "/profiles/" + name + "/channels/check", body); }
+
     private static AppException unsupported(Throwable cause) {
         return new AppException(ErrorCode.HERMES_UNSUPPORTED,
                 "Máy Hermes chưa hỗ trợ tạo bot: hermes_admin.py cần thêm POST /profiles", null, cause);
@@ -137,18 +153,26 @@ public class HermesBotClient {
             if (body != null) b.header("Content-Type", "application/json");
             b.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                     : HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
+            long started = System.nanoTime();
             HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
             int code = r.statusCode();
+            long ms = (System.nanoTime() - started) / 1_000_000;
             JsonNode out = parse(r.body());
-            if (code / 100 == 2) return out;
+            if (code / 100 == 2) {
+                log.debug("hermes-admin {} {} -> {} ({} ms)", method, path, code, ms);
+                return out;
+            }
             String msg = out.path("error").asText("Hermes admin lỗi HTTP " + code);
+            // 400/404/409 là phản hồi nghiệp vụ bình thường (INFO); 401/403/5xx là máy Hermes hoặc khoá có vấn đề (WARN)
+            if (code == 400 || code == 404 || code == 409) log.info("hermes-admin {} {} -> {} ({} ms): {}", method, path, code, ms, msg);
+            else log.warn("hermes-admin {} {} -> {} ({} ms): {}", method, path, code, ms, msg);
             if (code == 400) throw new AppException(ErrorCode.VALIDATION, msg);
             if (code == 409) throw new AppException(ErrorCode.CONFLICT, msg);
             if (code == 404) throw new NotFoundException("bot Hermes", path);
             if (code == 503) throw new AppException(ErrorCode.HERMES_UNAVAILABLE, msg); // máy điều khiển kênh tắt: nói rõ máy nào
-            log.warn("Hermes admin {} {} -> HTTP {}: {}", method, path, code, msg);
             throw new AppException(ErrorCode.HERMES_UNAVAILABLE, "Máy Hermes từ chối (HTTP " + code + ")");
         } catch (IOException e) {
+            log.warn("hermes-admin {} {} không kết nối được: {}", method, path, e.toString());
             throw new AppException(ErrorCode.HERMES_UNAVAILABLE, "Không kết nối được máy Hermes", null, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -75,13 +75,13 @@ public class BizService {
 
     // ================================================================== kanban / task
     public BizDto.Page<OfficeDto.Task> kanbanPage(String column, UUID projectId, UUID agentId, UUID departmentId, String priority, String q,
-                                                String cursor, int limit) {
+                                                java.time.LocalDate from, java.time.LocalDate to, String cursor, int limit) {
         Priority p = null;
         if (priority != null && !priority.isBlank()) {
             try { p = Priority.valueOf(priority.toUpperCase(Locale.ROOT)); }
             catch (IllegalArgumentException e) { throw new AppException(ErrorCode.VALIDATION, "priority phải là HIGH|NORMAL|LOW"); }
         }
-        KanbanDto.Column c = kanban.board(new KanbanService.Filter(projectId, null, agentId, departmentId, p, q), limit, column(column), cursor)
+        KanbanDto.Column c = kanban.board(new KanbanService.Filter(projectId, null, agentId, departmentId, p, q, from, to), limit, column(column), cursor)
                 .columns().get(0);
         return new BizDto.Page<>(view.tasksByIds(c.cards().stream().map(KanbanDto.Card::id).toList()), c.total(), c.nextCursor());
     }

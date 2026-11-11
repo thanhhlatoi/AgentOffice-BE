@@ -35,13 +35,18 @@ public class AgentService {
     private final ObjectMapper mapper;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final com.agentoffice.config.LocalLlmProperties local;
+    private final String hermesLlmBaseUrl;
     private final TransactionTemplate tx;
+    private final com.agentoffice.service.studio.PromptVersionService versions;
 
     public AgentService(AgentRepository repo, HermesBotClient hermes, HermesAdminProperties props, ObjectMapper mapper,
                         org.springframework.jdbc.core.JdbcTemplate jdbc, com.agentoffice.config.LocalLlmProperties local,
-                        TransactionTemplate tx) {
+                        TransactionTemplate tx, com.agentoffice.service.studio.PromptVersionService versions,
+                        @org.springframework.beans.factory.annotation.Value("${agentoffice.hermes-llm.base-url:}") String hermesLlmBaseUrl) {
         this.tx = tx;
+        this.versions = versions;
         this.local = local;
+        this.hermesLlmBaseUrl = hermesLlmBaseUrl == null ? "" : hermesLlmBaseUrl.trim().replaceAll("/+$", "");
         this.jdbc = jdbc;
         this.repo = repo;
         this.hermes = hermes;
@@ -53,7 +58,9 @@ public class AgentService {
     public record Profile(String systemPrompt, String model, String color, java.util.List<String> skills) {}
 
     /** Những gì hồ sơ agent quyết định trên bot; model = null nghĩa là giữ model của bot. */
-    private record BotFields(String description, String soul, String model) {}
+    private record BotFields(String description, String soul, String model, String provider, String baseUrl, Integer contextLength) {}
+
+    private record BotModel(String model, String provider, String baseUrl, Integer contextLength) {}
 
     public Agent create(String name, String role, String department) { return create(name, role, department, null); }
 
@@ -62,7 +69,9 @@ public class AgentService {
         Agent agent = tx.execute(s -> {
             Agent a = new Agent(name, role, department);
             apply(a, profile);
-            return repo.save(a);
+            a = repo.saveAndFlush(a);
+            versions.record(a.getId(), a.getSystemPrompt(), "Bản khởi tạo", false);
+            return a;
         });
         if (!hermes.configured()) return agent;
         String botName = profileName(name, agent);
@@ -81,6 +90,14 @@ public class AgentService {
      * Gateway của bot cần restart thì model/SOUL mới có hiệu lực.
      */
     public Agent update(UUID id, String name, String role, String department, Profile profile) {
+        return update(id, name, role, department, profile, null);
+    }
+
+    /**
+     * promptNote != null: luôn ghi một phiên bản prompt với ghi chú này (Studio lưu / khôi phục / áp mẫu).
+     * promptNote = null: chỉ ghi phiên bản khi prompt thực sự đổi (sửa trong hồ sơ agent).
+     */
+    public Agent update(UUID id, String name, String role, String department, Profile profile, String promptNote) {
         Agent old = active(id);
         requireBotModel(profile == null ? null : profile.model(), old.getModelProfile());
         String newName = given(name, old.getName());
@@ -99,6 +116,8 @@ public class AgentService {
                 jdbc.update("UPDATE agent SET department_id = (SELECT id FROM department WHERE name = ?) WHERE id = ?", newDepartment, id);
             }
             apply(a, profile);
+            if (promptNote != null || !Objects.equals(prompt, old.getSystemPrompt()))
+                versions.record(id, prompt, promptNote != null ? promptNote : "Sửa trong hồ sơ agent", promptNote != null);
             return repo.save(a);
         });
     }
@@ -125,7 +144,10 @@ public class AgentService {
     }
 
     private BotFields fields(String name, String role, String department, String systemPrompt, String modelProfile) {
-        return new BotFields(role + " - " + department, soul(name, role, department, systemPrompt), botModel(modelProfile));
+        BotModel route = botRoute(modelProfile);
+        return new BotFields(role + " - " + department, soul(name, role, department, systemPrompt),
+                route == null ? null : route.model(), route == null ? null : route.provider(),
+                route == null ? null : route.baseUrl(), route == null ? null : route.contextLength());
     }
 
     private BotFields fields(Agent a) {
@@ -140,6 +162,9 @@ public class AgentService {
         if (!next.description().equals(current.description())) body.put("description", next.description());
         if (!next.soul().equals(current.soul())) body.put("soul", next.soul());
         if (next.model() != null && !next.model().equals(current.model())) body.put("model", next.model());
+        if (next.provider() != null && !next.provider().equals(current.provider())) body.put("provider", next.provider());
+        if (next.baseUrl() != null && !next.baseUrl().equals(current.baseUrl())) body.put("baseUrl", next.baseUrl());
+        if (next.contextLength() != null && !next.contextLength().equals(current.contextLength())) body.put("contextLength", next.contextLength());
         if (body.isEmpty()) return;
         try {
             hermes.update(old.getHermesProfile(), body);
@@ -250,6 +275,9 @@ public class AgentService {
         body.put("description", f.description());
         body.put("soul", f.soul());
         if (f.model() != null) body.put("model", f.model());
+        if (f.provider() != null) body.put("provider", f.provider());
+        if (f.baseUrl() != null) body.put("baseUrl", f.baseUrl());
+        if (f.contextLength() != null) body.put("contextLength", f.contextLength());
         return body;
     }
 
@@ -261,13 +289,26 @@ public class AgentService {
 
     /**
      * Model trên Ollama mà bot sẽ dùng, suy từ model_profile của agent: tên bí danh (local.small...) -> model thật;
-     * tên đã là model thật (có ':' hoặc '/', vd qwen3.6:35b...) -> dùng nguyên; tên khác (vd claude-*, không chạy được trên Ollama)
-     * -> null. Tạo/sửa agent từ chối giá trị này (requireBotModel), chỉ agent cũ còn giữ thì bot giữ nguyên model.
+     * tên đã là model thật (có ':' hoặc '/', vd qwen3.6:35b...) -> dùng nguyên; hồ sơ model LOCAL (thêm ở trang Model) -> cột model;
+     * tên khác (vd cloud.*, claude-*, không chạy được trên Ollama) -> null. Tạo/sửa agent từ chối giá trị này (requireBotModel),
+     * chỉ agent cũ còn giữ thì bot giữ nguyên model.
      */
     String botModel(String modelProfile) {
+        BotModel route = botRoute(modelProfile);
+        return route == null ? null : route.model();
+    }
+
+    private BotModel botRoute(String modelProfile) {
         if (modelProfile == null || modelProfile.isBlank()) return null;
         String alias = local.modelAliases() == null ? null : local.modelAliases().get(modelProfile);
-        if (alias != null && !alias.isBlank()) return alias;
-        return modelProfile.contains(":") || modelProfile.contains("/") ? modelProfile : null;
+        if (alias != null && !alias.isBlank()) return new BotModel(alias, null, null, null);
+        if (modelProfile.contains(":") || modelProfile.contains("/")) return new BotModel(modelProfile, null, null, null);
+        if (jdbc == null) return null;
+        return jdbc.query("SELECT model, is_local, context_tokens FROM model_profile WHERE name = ?", rs -> {
+            if (!rs.next()) return null;
+            if (rs.getBoolean("is_local")) return new BotModel(rs.getString("model"), null, null, null);
+            if (hermesLlmBaseUrl.isBlank()) return null;
+            return new BotModel(rs.getString("model"), "custom", hermesLlmBaseUrl, rs.getInt("context_tokens"));
+        }, modelProfile);
     }
 }

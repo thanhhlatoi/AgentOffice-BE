@@ -51,9 +51,12 @@ public class TaskController {
     public PageDto<TaskDto> list(@RequestParam(required = false) TaskStatus status,
                                  @RequestParam(required = false) UUID agentId,
                                  @RequestParam(required = false) UUID goalId,
+                                 @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+                                 @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+                                 @RequestParam(required = false) String q,
                                  @RequestParam(defaultValue = "0") @Min(0) int page,
                                  @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return PageDto.of(tasks.search(status, agentId, goalId, page, size).map(mapper::toDto));
+        return PageDto.of(tasks.search(status, agentId, goalId, from, to, q, page, size).map(mapper::toDto));
     }
 
     @GetMapping("/tasks/{id}")

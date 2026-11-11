@@ -33,7 +33,8 @@ class HermesAgentRunnerTest {
     private final String runId = taskId + "-2";
     private final HermesBotClient hermes = mock(HermesBotClient.class);
     private final AgentRepository agents = mock(AgentRepository.class);
-    private final HermesAgentRunner runner = new HermesAgentRunner(hermes, agents, 1, 60);
+    private final com.agentoffice.service.usage.HermesUsageRecorder usage = mock(com.agentoffice.service.usage.HermesUsageRecorder.class);
+    private final HermesAgentRunner runner = new HermesAgentRunner(hermes, agents, usage, 1, 60);
 
     @BeforeEach
     void setUp() {

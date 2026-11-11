@@ -1,5 +1,9 @@
 package com.agentoffice.controller.project;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.domain.project.ProjectStatus;
 import com.agentoffice.dto.project.ProjectDto;
 import com.agentoffice.mapper.project.ProjectMapper;
@@ -29,8 +33,8 @@ public class ProjectController {
     public ProjectDto.View create(@Valid @RequestBody ProjectDto.Create r) { return mapper.toView(projects.create(r)); }
 
     @GetMapping("/projects")
-    public List<ProjectDto.View> list(@RequestParam(required = false) List<ProjectStatus> status) {
-        return projects.list(status).stream().map(mapper::toView).toList();
+    public List<ProjectDto.View> list(@RequestParam(required = false) List<ProjectStatus> status, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) {
+        return Paging.slice(projects.list(status).stream().map(mapper::toView).toList(), page, size, res);
     }
 
     /** Kèm tiến độ, số task theo trạng thái, chi phí/ngân sách, hạn chót, goals. */

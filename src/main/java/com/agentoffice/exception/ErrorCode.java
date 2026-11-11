@@ -15,11 +15,14 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT),
     UNPROCESSABLE(HttpStatus.UNPROCESSABLE_ENTITY),
     PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
     OPTIMISTIC_LOCK(HttpStatus.CONFLICT),
     INTERNAL(HttpStatus.INTERNAL_SERVER_ERROR),
     NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED),
+    /** Không được phép (vd xoá mẫu dựng sẵn, công cụ bị khoá: details.reasonCode). */
+    FORBIDDEN(HttpStatus.FORBIDDEN),
 
     // ---- task / orchestrator
     TASK_ILLEGAL_TRANSITION(HttpStatus.CONFLICT),
@@ -44,6 +47,9 @@ public enum ErrorCode {
     LLM_GATEWAY_ERROR(HttpStatus.BAD_GATEWAY),
     LLM_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
 
+    // ---- Redis coordination
+    REDIS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+
     // ---- hermes admin (bot/profile trên máy Hermes)
     HERMES_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE),
     HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
@@ -67,6 +73,7 @@ public enum ErrorCode {
             case 409 -> CONFLICT;
             case 413 -> PAYLOAD_TOO_LARGE;
             case 415 -> UNSUPPORTED_MEDIA_TYPE;
+            case 429 -> RATE_LIMITED;
             case 422 -> UNPROCESSABLE;
             default -> s.is4xxClientError() ? VALIDATION : INTERNAL;
         };

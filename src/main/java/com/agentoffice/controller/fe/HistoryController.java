@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import com.agentoffice.service.redis.RedisCoordinator;
+import java.time.Duration;
 
 /** Thông báo trong app, cài đặt thông báo và lịch sử hội thoại cho FE (hợp đồng: BizDto, FE types/{notify,history}.ts). */
 @RestController
@@ -19,18 +21,22 @@ public class HistoryController {
     private final NotifyService notify;
     private final HistoryService history;
     private final com.agentoffice.service.fe.StatsService stats;
+    private final RedisCoordinator redis;
 
-    public HistoryController(NotifyService notify, HistoryService history, com.agentoffice.service.fe.StatsService stats) {
+    public HistoryController(NotifyService notify, HistoryService history, com.agentoffice.service.fe.StatsService stats, RedisCoordinator redis) {
         this.notify = notify;
         this.history = history;
         this.stats = stats;
+        this.redis = redis;
     }
 
     // ---- dashboard
     @GetMapping("/stats/overview")
     public com.agentoffice.service.fe.StatsService.Overview overview(@RequestParam(required = false) String from, @RequestParam(required = false) String to,
                                                                      @RequestParam(required = false) UUID departmentId, @RequestParam(required = false) UUID projectId) {
-        return stats.overview(from, to, departmentId, projectId);
+        String key = "stats-overview:" + value(from) + ":" + value(to) + ":" + value(departmentId) + ":" + value(projectId);
+        return redis.cached(key, com.agentoffice.service.fe.StatsService.Overview.class, Duration.ofSeconds(5),
+                () -> stats.overview(from, to, departmentId, projectId));
     }
 
     // ---- thông báo
@@ -91,4 +97,5 @@ public class HistoryController {
     public void delete(@PathVariable UUID id) { history.delete(id); }
 
     private static int clamp(int n, int max) { return Math.max(1, Math.min(n, max)); }
+    private static String value(Object v) { return v == null ? "_" : v.toString(); }
 }

@@ -1,5 +1,9 @@
 package com.agentoffice.controller.task;
 
+import jakarta.servlet.http.HttpServletResponse;
+
+import com.agentoffice.controller.support.Paging;
+
 import com.agentoffice.dto.task.GoalDetailDto;
 import com.agentoffice.dto.task.GoalDto;
 import com.agentoffice.mapper.task.GoalMapper;
@@ -43,7 +47,7 @@ public class GoalController {
     }
 
     @GetMapping
-    public List<GoalDto> list() { return goals.list(); }
+    public List<GoalDto> list(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size, HttpServletResponse res) { return Paging.slice(goals.list(), page, size, res); }
 
     @GetMapping("/{id}")
     public GoalDetailDto get(@PathVariable UUID id) { return goals.detail(id); }

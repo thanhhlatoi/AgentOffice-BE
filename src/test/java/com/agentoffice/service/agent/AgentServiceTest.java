@@ -39,7 +39,7 @@ class AgentServiceTest {
     private static AgentService svc() {
         var local = new com.agentoffice.config.LocalLlmProperties("http://x/v1", "", "ollama", "qwen3.6-64k:latest",
                 java.util.Map.of("local.small", "qwen3.6-64k:latest"), java.time.Duration.ofSeconds(5), "");
-        return new AgentService(null, null, null, null, null, local, null);
+        return new AgentService(null, null, null, null, null, local, null, null, "");
     }
 
     @Test

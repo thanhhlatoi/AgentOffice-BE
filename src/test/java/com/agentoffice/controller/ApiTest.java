@@ -150,8 +150,10 @@ class ApiTest {
     }
 
     @Test void listTasksFiltersAndPagingBounds() throws Exception {
-        when(tasks.search(any(), any(), any(), anyInt(), anyInt())).thenReturn(new PageImpl<>(List.of(task())));
+        when(tasks.search(any(), any(), any(), any(), any(), any(), anyInt(), anyInt())).thenReturn(new PageImpl<>(List.of(task())));
         mvc.perform(get("/api/tasks?status=QUEUED&agentId=" + id)).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        mvc.perform(get("/api/tasks?from=2026-11-01&to=2026-11-12&q=abc")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        mvc.perform(get("/api/tasks?from=11-2026")).andExpect(status().isBadRequest());
         mvc.perform(get("/api/tasks?status=NOPE")).andExpect(status().isBadRequest());
         mvc.perform(get("/api/tasks?size=1000")).andExpect(status().isBadRequest());
         mvc.perform(get("/api/tasks?page=-1")).andExpect(status().isBadRequest());

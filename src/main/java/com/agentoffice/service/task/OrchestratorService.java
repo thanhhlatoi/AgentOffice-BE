@@ -68,7 +68,7 @@ public class OrchestratorService {
     private final ObjectMapper mapper;
     private final Clock clock;
     private final TransactionTemplate tx;
-    private final ExecutorService planningPool = Executors.newFixedThreadPool(2);
+    private final ExecutorService planningPool = Executors.newFixedThreadPool(2, Thread.ofPlatform().name("planner-", 1).factory());
 
     public OrchestratorService(Planner planner, PlanValidator validator, GoalService goalService, GoalRepository goals,
                                TaskService taskService, TaskRepository tasks, AgentRepository agents,
@@ -120,11 +120,14 @@ public class OrchestratorService {
             Goal goal = goalService.get(goalId);
             if (goal.getStatus() != GoalStatus.PLANNING) return;          // bị huỷ trong lúc chờ Planner
             infos = activeAgents();
+            log.info("lập kế hoạch lần {}/{} ({} agent, feedback={})", attempt + 1, MAX_PLANNER_CALLS, infos.size(), fb.size());
             try {
                 Plan p = fb.isEmpty() ? planner.propose(goal, infos) : planner.revise(goal, infos, fb);
                 errors = validator.validate(p, infos);
-                if (errors.isEmpty()) { plan = p; break; }
+                if (errors.isEmpty()) { plan = p; log.info("kế hoạch hợp lệ: {} task", p.tasks().size()); break; }
+                log.warn("kế hoạch lần {} không hợp lệ: {}", attempt + 1, errors);
             } catch (PlannerException e) {
+                log.warn("planner lỗi ở lần {}: {}", attempt + 1, e.getMessage());
                 errors = List.of(e.getMessage());
             }
             fb = errors;

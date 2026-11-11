@@ -22,7 +22,8 @@ import org.testcontainers.utility.DockerImageName;
 /** Base cho test tích hợp: 1 Postgres (pgvector) dùng chung cả JVM, DB được dọn sạch trước mỗi test. */
 @SpringBootTest
 @ActiveProfiles("test")
-@TestPropertySource(properties = "agentoffice.llm.provider=fake")   // .env của dev (LLM_PROVIDER) không được làm test gọi gateway thật
+// .env của dev không được làm test gọi máy thật: LLM_PROVIDER (gateway) và HERMES_ADMIN_URL (tạo/xoá bot Hermes thật)
+@TestPropertySource(properties = {"agentoffice.llm.provider=fake", "agentoffice.hermes-admin.url="})
 @Import(TestClockConfig.class)
 public abstract class PostgresIT {
     public static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>(
@@ -43,18 +44,37 @@ public abstract class PostgresIT {
     @Autowired protected DomainEventRepository eventRepo;
     @Autowired protected MutableClock clock;
 
-    /** Xoá dữ liệu nghiệp vụ (giữ approval_policy đã seed). session_replication_role=replica tắt trigger append-only để TRUNCATE. */
+    /**
+     * Xoá dữ liệu nghiệp vụ (giữ approval_policy đã seed). session_replication_role=replica tắt trigger append-only để TRUNCATE.
+     * TRUNCATE cần khoá độc quyền trên nhiều bảng cùng lúc, trong khi luồng nền (@Scheduled) của các Spring context test khác
+     * vẫn đọc DB: Postgres có thể báo deadlock và huỷ một bên. Thử lại vài lần thay vì để test fail ngẫu nhiên.
+     */
     @BeforeEach
-    void cleanDatabase() {
+    void cleanDatabase() throws InterruptedException {
         clock.reset();
+        for (int attempt = 1; ; attempt++) {
+            try {
+                truncateAll();
+                return;
+            } catch (org.springframework.dao.PessimisticLockingFailureException e) {
+                if (attempt == 5) throw e;
+                Thread.sleep(50L * attempt);
+            }
+        }
+    }
+
+    private void truncateAll() {
         jdbc.execute((ConnectionCallback<Void>) c -> {
             try (var s = c.createStatement()) {
                 s.execute("SET session_replication_role = replica");
-                s.execute("TRUNCATE budget_change, budget_counter, usage_record, usage_daily, approval_audit, approval, task_dependency, task, goal, agent, domain_event, permission_audit RESTART IDENTITY CASCADE");
-                // ngân sách: chỉ giữ 2 dòng GLOBAL mẫu của V10 (tạo lại để test nào sửa/tắt chúng không ảnh hưởng test khác)
-                s.execute("DELETE FROM budget");
-                s.execute("INSERT INTO budget (scope_type, scope_id, period, limit_micro_usd) VALUES ('GLOBAL', NULL, 'DAY', 5000000), ('GLOBAL', NULL, 'MONTH', 100000000)");
-                s.execute("SET session_replication_role = DEFAULT");
+                try {
+                    s.execute("TRUNCATE routing_rule, model_comparison, budget_change, budget_counter, usage_record, usage_daily, approval_audit, approval, task_dependency, task, goal, agent, domain_event, permission_audit RESTART IDENTITY CASCADE");
+                    // ngân sách: chỉ giữ 2 dòng GLOBAL mẫu của V10 (tạo lại để test nào sửa/tắt chúng không ảnh hưởng test khác)
+                    s.execute("DELETE FROM budget");
+                    s.execute("INSERT INTO budget (scope_type, scope_id, period, limit_micro_usd) VALUES ('GLOBAL', NULL, 'DAY', 5000000), ('GLOBAL', NULL, 'MONTH', 100000000)");
+                } finally {
+                    s.execute("SET session_replication_role = DEFAULT");    // connection quay về pool: không được để trigger bị tắt
+                }
                 s.execute("UPDATE system_state SET value = 'false' WHERE key = 'paused'");
             }
             return null;

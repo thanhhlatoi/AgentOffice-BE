@@ -109,6 +109,48 @@ public class RealtimeRelay {
                 m.put("state", EventTypes.SYSTEM_PAUSED.equals(type) ? "PAUSED" : "RUNNING");
                 out.add(m);
             }
+            case EventTypes.DEPARTMENT_DISPATCH -> {
+                // FE vẽ đường nối từ bàn trưởng phòng tới từng nhân viên (realtime/dispatch.ts)
+                com.fasterxml.jackson.databind.JsonNode p;
+                try {
+                    p = mapper.readTree(e.getPayload());
+                } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+                    throw new IllegalStateException("payload department.dispatch hỏng", ex);
+                }
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("type", "department.dispatch");
+                m.put("departmentId", p.path("departmentId").asText());
+                m.put("headId", p.path("headId").asText());
+                List<String> targets = new java.util.ArrayList<>();
+                p.path("targetAgentIds").forEach(t -> targets.add(t.asText()));
+                m.put("targetAgentIds", targets);
+                out.add(m);
+            }
+            case EventTypes.TEMPLATE_INSTANTIATED -> {
+                // FE tải lại danh sách mẫu / agent (realtime/dispatch.ts)
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("type", "template.instantiated");
+                m.put("templateId", id.toString());
+                try {
+                    m.put("agentId", mapper.readTree(e.getPayload()).path("agentId").asText());
+                } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+                    throw new IllegalStateException("payload template.instantiated hỏng", ex);
+                }
+                out.add(m);
+            }
+            case EventTypes.MODEL_HEALTH_CHANGED -> {
+                // FE cập nhật chấm sức khoẻ trong danh sách model, tải lại chính sách model (realtime/dispatch.ts)
+                try {
+                    com.fasterxml.jackson.databind.JsonNode p = mapper.readTree(e.getPayload());
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("type", "model.health_changed");
+                    m.put("modelId", p.path("modelId").asText());
+                    m.put("health", mapper.convertValue(p.path("health"), Map.class));
+                    out.add(m);
+                } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+                    throw new IllegalStateException("payload model.health_changed hỏng", ex);
+                }
+            }
             default -> { /* project.*, budget.*, usage.*: FE chưa nối phần này với BE, vẫn dùng mock */ }
         }
         return out;

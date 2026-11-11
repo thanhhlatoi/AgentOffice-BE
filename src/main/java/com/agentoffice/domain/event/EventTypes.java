@@ -26,4 +26,11 @@ public final class EventTypes {
     public static final String TASK_MOVED = "task.moved";
     public static final String SYSTEM_PAUSED = "system.paused";
     public static final String SYSTEM_RESUMED = "system.resumed";
+    /** Trưởng phòng chia việc (POST /departments/{id}/goals): ghi TRƯỚC các task.created để FE vẽ đường nối trước. */
+    public static final String DEPARTMENT_DISPATCH = "department.dispatch";
+    /** Tạo agent từ mẫu: payload {templateId, agentId}. */
+    public static final String TEMPLATE_INSTANTIATED = "template.instantiated";
+    public static final String MODEL_HEALTH_CHANGED = "model.health_changed";
+    /** Tiến độ pipeline KarmaStoryAI của một dự án; chỉ đi qua SSE /api/events/stream (RealtimeRelay STOMP bỏ qua). */
+    public static final String KARMA_PROGRESS = "karma.progress";
 }

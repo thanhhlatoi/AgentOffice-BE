@@ -15,16 +15,21 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.agentoffice.service.redis.RedisCoordinator;
+import java.time.Duration;
 
+/** /api/fe/llm: FE gọi với VITE_API_BASE_URL=.../api/fe (api/gateway.ts, chế độ live, không có mock dự phòng). */
 @RestController
-@RequestMapping("/api/llm")
+@RequestMapping({"/api/llm", "/api/fe/llm"})
 public class LlmModelController {
     private final LlmModelService service;
     private final ModelTestService tester;
+    private final RedisCoordinator redis;
 
-    public LlmModelController(LlmModelService service, ModelTestService tester) {
+    public LlmModelController(LlmModelService service, ModelTestService tester, RedisCoordinator redis) {
         this.service = service;
         this.tester = tester;
+        this.redis = redis;
     }
 
     /** Nhà cung cấp đã kết nối trên gateway (9Router) và số model của mỗi nhà. Rỗng khi agentoffice.llm.provider=fake. */
@@ -38,5 +43,8 @@ public class LlmModelController {
     /** Gọi thử một model (TỐN token thật, ghi usage purpose=MODEL_TEST). Lỗi gọi => 200 với ok=false; hết ngân sách => 422. */
     @PostMapping("/models/test")
     @SensitiveAction("llm.model-test")
-    public ModelTestResponse test(@Valid @RequestBody ModelTestRequest r) { return tester.test(r.model()); }
+    public ModelTestResponse test(@Valid @RequestBody ModelTestRequest r) {
+        redis.requirePermit("model-test", "global", 5, Duration.ofMinutes(1));
+        return tester.test(r.model());
+    }
 }

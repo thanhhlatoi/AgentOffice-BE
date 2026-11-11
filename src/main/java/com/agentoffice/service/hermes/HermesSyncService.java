@@ -198,6 +198,13 @@ public class HermesSyncService {
         return hermes.channelAction(botOf(agentId), action, channel, machine);
     }
 
+    // ------------------------------------------------------------------ lịch tự động (theo agent)
+    public JsonNode schedule(UUID agentId) { return hermes.schedule(botOf(agentId)); }
+
+    public JsonNode scheduleAction(UUID agentId, String action, JsonNode body) {
+        return hermes.scheduleAction(botOf(agentId), action, body);
+    }
+
     private String botOf(UUID agentId) {
         Agent a = agents.findById(agentId).filter(x -> x.getArchivedAt() == null).orElseThrow(() -> new NotFoundException("agent", agentId));
         if (a.getHermesProfile() == null)

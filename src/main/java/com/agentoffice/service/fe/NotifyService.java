@@ -190,6 +190,7 @@ public class NotifyService {
         switch (ev) {
             case "goal.succeeded" -> { type = "goal.done"; level = "SUCCESS"; kind = "GOAL"; title = "Mục tiêu hoàn thành: " + p.path("title").asText("(không tên)"); }
             case "goal.failed" -> { type = "goal.failed"; level = "WARNING"; kind = "GOAL"; title = "Mục tiêu thất bại: " + p.path("title").asText("(không tên)"); body = p.path("error").asText(""); }
+            case "task.succeeded" -> { type = "task.done"; level = "SUCCESS"; kind = "TASK"; title = "Task hoàn thành: " + p.path("title").asText("(không tên)"); }
             case "task.failed" -> { type = "task.failed"; level = "WARNING"; kind = "TASK"; title = "Task thất bại"; body = p.path("error").asText(p.path("reason").asText("")); }
             case "approval.requested" -> { type = "approval.requested"; level = "WARNING"; kind = "APPROVAL"; title = "Cần duyệt: " + p.path("preview").asText(p.path("toolName").asText("yêu cầu")); }
             case "budget.warning" -> { type = "budget.soft"; level = "WARNING"; kind = "BUDGET"; title = "Ngân sách sắp hết"; }

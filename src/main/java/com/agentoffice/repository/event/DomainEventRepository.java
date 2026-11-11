@@ -11,4 +11,8 @@ public interface DomainEventRepository extends JpaRepository<DomainEvent, Long> 
     long maxId();
 
     List<DomainEvent> findTop200ByIdGreaterThanOrderByIdAsc(long afterId);
+
+    List<DomainEvent> findByTypeOrderByIdAsc(String type);
+
+    List<DomainEvent> findTop200ByTypeAndAggregateIdOrderByIdDesc(String type, java.util.UUID aggregateId);
 }

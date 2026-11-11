@@ -21,6 +21,8 @@ import com.agentoffice.util.TextNormalizer;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -42,7 +44,13 @@ public class KanbanService {
     private static final Set<TaskStatus> NOT_STARTED = Set.of(TaskStatus.PENDING, TaskStatus.BLOCKED, TaskStatus.QUEUED);
     private static final String PRIO = "CASE t.priority WHEN 'HIGH' THEN 0 WHEN 'NORMAL' THEN 1 ELSE 2 END";
 
-    public record Filter(UUID projectId, UUID goalId, UUID agentId, UUID departmentId, Priority priority, String q) {}
+    /** from/to: ngày TẠO task (gồm cả hai đầu, theo múi giờ báo cáo); null = không giới hạn. */
+    public record Filter(UUID projectId, UUID goalId, UUID agentId, UUID departmentId, Priority priority, String q, LocalDate from, LocalDate to) {
+        public Filter(UUID projectId, UUID goalId, UUID agentId, UUID departmentId, Priority priority, String q) {
+            this(projectId, goalId, agentId, departmentId, priority, q, null, null);
+        }
+    }
+    private static final ZoneId REPORT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");   // khớp mặc định agentoffice.usage.report-zone
 
     private final JdbcTemplate jdbc;
     private final TaskRepository tasks;
@@ -122,7 +130,7 @@ public class KanbanService {
             KanbanDto.Card card = new KanbanDto.Card(rs.getObject(1, UUID.class), rs.getString(2), rs.getObject(3, UUID.class), rs.getString(4),
                     Priority.valueOf(rs.getString(5)), st, rs.getObject(7, UUID.class), rs.getString(8), rs.getObject(9, UUID.class),
                     rs.getString(10), null, rs.getLong(16), Math.max(0, Duration.between(created, now).getSeconds()), lockedReason(st),
-                    rs.getLong(11), rs.getObject(12, UUID.class));
+                    rs.getLong(11), rs.getObject(12, UUID.class), created, rs.getTimestamp(14).toInstant());
             return new Row(card, rs.getLong(17), rs.getTimestamp(14).toInstant(), rs.getString(15));
         }, pageArgs.toArray());
 
@@ -144,7 +152,7 @@ public class KanbanService {
                 (rs, i) -> new ProgressCalculator.Item(rs.getInt(1), rs.getString(2)), c.id());
         return new KanbanDto.Card(c.id(), c.title(), c.assigneeAgentId(), c.assigneeName(), c.priority(), c.status(), c.projectId(),
                 c.projectColor(), c.goalId(), c.goalTitle(), calculator.percent(kids), c.costMicroUsd(), c.ageSec(), c.lockedReason(),
-                c.version(), c.retryOfTaskId());
+                c.version(), c.retryOfTaskId(), c.createdAt(), c.updatedAt());
     }
 
     private static int prioOf(Priority p) { return switch (p) { case HIGH -> 0; case NORMAL -> 1; case LOW -> 2; }; }
@@ -173,6 +181,8 @@ public class KanbanService {
             w.append(" AND unaccent(lower(t.title)) LIKE ? ESCAPE '\\'");
             args.add("%" + needle + "%");
         }
+        if (f.from() != null) { w.append(" AND t.created_at >= ?"); args.add(OffsetDateTime.ofInstant(f.from().atStartOfDay(REPORT_ZONE).toInstant(), ZoneOffset.UTC)); }
+        if (f.to() != null) { w.append(" AND t.created_at < ?"); args.add(OffsetDateTime.ofInstant(f.to().plusDays(1).atStartOfDay(REPORT_ZONE).toInstant(), ZoneOffset.UTC)); }
         return w.toString();
     }
 
